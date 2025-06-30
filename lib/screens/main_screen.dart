@@ -1,0 +1,305 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/product_provider.dart';
+import '../providers/download_provider.dart';
+import '../widgets/product_grid.dart';
+import '../widgets/search_bar.dart';
+import '../widgets/download_panel.dart';
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  bool _showDownloadPanel = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load products when the screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ProductProvider>(context, listen: false).loadProducts();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Row(
+          children: [
+            Icon(Icons.flight_takeoff),
+            SizedBox(width: 8),
+            Text('JustFlight Downloader'),
+          ],
+        ),
+        actions: [
+          Consumer<DownloadProvider>(
+            builder: (context, downloadProvider, child) {
+              final activeDownloads = downloadProvider.activeDownloads.length;
+              return IconButton(
+                icon: Badge(
+                  label: Text('$activeDownloads'),
+                  isLabelVisible: activeDownloads > 0,
+                  child: const Icon(Icons.download),
+                ),
+                onPressed: () => setState(() => _showDownloadPanel = !_showDownloadPanel),
+                tooltip: 'Downloads',
+              );
+            },
+          ),
+          Consumer<ProductProvider>(
+            builder: (context, productProvider, child) {
+              return IconButton(
+                icon: productProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: productProvider.isLoading ? null : () => productProvider.refreshProducts(),
+                tooltip: 'Refresh',
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, child) {
+              return PopupMenuButton<String>(
+                tooltip: 'Account',
+                icon: const Icon(Icons.account_circle),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'logout':
+                      _handleLogout();
+                      break;
+                    case 'settings':
+                      _showSettings();
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  if (authProvider.username != null)
+                    PopupMenuItem<String>(
+                      enabled: false,
+                      child: Text(
+                        authProvider.username!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  const PopupMenuItem<String>(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings),
+                        SizedBox(width: 8),
+                        Text('Settings'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout),
+                        SizedBox(width: 8),
+                        Text('Logout'),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search and filter bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                ),
+              ),
+            ),
+            child: const CustomSearchBar(),
+          ),
+          
+          // Main content area
+          Expanded(
+            child: Row(
+              children: [
+                // Products area
+                Expanded(
+                  flex: _showDownloadPanel ? 2 : 1,
+                  child: Consumer<ProductProvider>(
+                    builder: (context, productProvider, child) {
+                      if (productProvider.isLoading && productProvider.products.isEmpty) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Loading your products...'),
+                            ],
+                          ),
+                        );
+                      }
+
+                      if (productProvider.error != null) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error loading products',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                productProvider.error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () => productProvider.refreshProducts(),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      if (productProvider.products.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No products found',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Make sure you have purchased products from JustFlight\nand that you\'re logged in with the correct account.',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () => productProvider.refreshProducts(),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Refresh'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return const ProductGrid();
+                    },
+                  ),
+                ),
+                
+                // Download panel
+                if (_showDownloadPanel)
+                  Container(
+                    width: 400,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    child: const DownloadPanel(),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleLogout() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.logout();
+  }
+
+  void _showSettings() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Settings'),
+        content: Consumer<DownloadProvider>(
+          builder: (context, downloadProvider, child) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Max Concurrent Downloads'),
+                  subtitle: Text('${downloadProvider.maxConcurrentDownloads}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove),
+                        onPressed: downloadProvider.maxConcurrentDownloads > 1
+                            ? () => downloadProvider.setMaxConcurrentDownloads(
+                                downloadProvider.maxConcurrentDownloads - 1)
+                            : null,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: downloadProvider.maxConcurrentDownloads < 10
+                            ? () => downloadProvider.setMaxConcurrentDownloads(
+                                downloadProvider.maxConcurrentDownloads + 1)
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}

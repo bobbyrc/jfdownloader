@@ -1,0 +1,5 @@
+# Test-specific analysis options
+linter:
+  rules:
+    # Allow print statements in tests
+    - avoid_print

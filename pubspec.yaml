@@ -1,0 +1,51 @@
+name: jfdownloader
+description: A cross-platform desktop application for downloading JustFlight products
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI and state management
+  cupertino_icons: ^1.0.2
+  provider: ^6.1.1
+  
+  # HTTP and web scraping
+  http: ^1.1.0
+  html: ^0.15.4
+  dio: ^5.4.0
+  cookie_jar: ^4.0.8
+  dio_cookie_manager: ^3.1.1
+  
+  # File handling and downloads
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  file_picker: ^6.1.1
+  
+  # Desktop integration
+  window_manager: ^0.3.7
+  
+  # JSON and data handling
+  json_annotation: ^4.8.1
+  
+  # Utilities
+  url_launcher: ^6.2.2
+  package_info_plus: ^4.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.7
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
