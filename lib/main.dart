@@ -6,9 +6,20 @@ import 'providers/product_provider.dart';
 import 'providers/download_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
+import 'services/logger_service.dart';
+import 'services/cache_service.dart';
+import 'services/performance_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize services
+  LoggerService.initialize();
+  await CacheService.initialize();
+  await PerformanceService.initialize();
+  
+  final logger = LoggerService();
+  logger.info('Starting JustFlight Downloader');
   
   // Initialize window manager for desktop
   await windowManager.ensureInitialized();

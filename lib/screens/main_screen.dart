@@ -6,6 +6,7 @@ import '../providers/download_provider.dart';
 import '../widgets/product_grid.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/download_panel.dart';
+import 'advanced_settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -74,15 +75,17 @@ class _MainScreenState extends State<MainScreen> {
               return PopupMenuButton<String>(
                 tooltip: 'Account',
                 icon: const Icon(Icons.account_circle),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'logout':
-                      _handleLogout();
-                      break;
-                    case 'settings':
-                      _showSettings();
-                      break;
-                  }
+                onSelected: (value) {                switch (value) {
+                  case 'logout':
+                    _handleLogout();
+                    break;
+                  case 'settings':
+                    _showSettings();
+                    break;
+                  case 'advanced':
+                    _showAdvancedSettings();
+                    break;
+                }
                 },
                 itemBuilder: (context) => [
                   if (authProvider.username != null)
@@ -103,6 +106,16 @@ class _MainScreenState extends State<MainScreen> {
                         Icon(Icons.settings),
                         SizedBox(width: 8),
                         Text('Settings'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'advanced',
+                    child: Row(
+                      children: [
+                        Icon(Icons.tune),
+                        SizedBox(width: 8),
+                        Text('Advanced'),
                       ],
                     ),
                   ),
@@ -398,6 +411,14 @@ class _MainScreenState extends State<MainScreen> {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAdvancedSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const AdvancedSettingsScreen(),
       ),
     );
   }

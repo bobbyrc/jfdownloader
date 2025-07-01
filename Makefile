@@ -14,6 +14,8 @@ help:
 	@echo "🧪 Testing & Analysis:"
 	@echo "  test-product-page - Test product page structure analysis"
 	@echo "  analyze-html     - Analyze captured HTML files"
+	@echo "  profile          - Run with performance profiling"
+	@echo "  benchmark        - Run performance benchmarks"
 	@echo ""
 	@echo "🔧 Utilities:"
 	@echo "  restart-app     - Kill and restart Flutter app"
@@ -102,4 +104,39 @@ disable-autofill:
 	@sed -i '' 's/static const bool _debugAutoFill = true;/static const bool _debugAutoFill = false;/' lib/screens/login_screen.dart
 	@echo "✅ Auto-fill disabled. Remember to remove or secure credentials.txt before deployment."
 
-.PHONY: help setup run debug run-verbose clean analyze test build-debug build-release run-windows run-linux dev-setup test-product-page analyze-html restart-app debug-run disable-autofill
+# Performance and optimization targets
+profile:
+	@echo "📊 Running with performance profiling..."
+	flutter run -d macos --profile --dart-define=PERFORMANCE_OVERLAY=true
+
+benchmark:
+	@echo "⏱️ Running performance benchmarks..."
+	@echo "Testing image loading performance..."
+	@time flutter run -d macos --profile --dart-define=BENCHMARK_MODE=true
+
+# Code quality targets
+lint:
+	@echo "🔍 Running comprehensive code analysis..."
+	flutter analyze --fatal-infos
+	dart format --set-exit-if-changed lib/ test/
+
+fix:
+	@echo "🔧 Auto-fixing code issues..."
+	dart format lib/ test/
+	dart fix --apply
+
+# Memory and performance analysis
+memory-test:
+	@echo "🧠 Running memory usage test..."
+	flutter run -d macos --profile --dart-define=MEMORY_TEST=true
+
+# Clean everything including caches
+deep-clean: clean
+	@echo "🧹 Deep cleaning project..."
+	@rm -rf .dart_tool/
+	@rm -rf build/
+	@rm -rf macos/build/
+	@rm -rf ~/.pub-cache/hosted/pub.dartlang.org/
+	flutter pub get
+
+.PHONY: help setup run debug run-verbose clean analyze test build-debug build-release run-windows run-linux dev-setup test-product-page analyze-html restart-app debug-run disable-autofill profile benchmark lint fix memory-test deep-clean

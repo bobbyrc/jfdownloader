@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'justflight_service.dart';
+import 'logger_service.dart';
 
 class DownloadService {
   static final DownloadService _instance = DownloadService._internal();
@@ -12,6 +13,7 @@ class DownloadService {
   final Dio _dio = Dio();
   final JustFlightService _justFlightService = JustFlightService();
   final Map<String, CancelToken> _downloadCancelTokens = {};
+  final LoggerService _logger = LoggerService();
 
   Future<String> downloadFile(
     String downloadUrl, // Now expects the actual download URL
@@ -27,8 +29,8 @@ class DownloadService {
       final cancelToken = CancelToken();
       _downloadCancelTokens[downloadUrl] = cancelToken;
 
-      print('Starting download: $downloadUrl');
-      print('Saving to: $filePath');
+      _logger.info('Starting download: $downloadUrl');
+      _logger.debug('Saving to: $filePath');
 
       // Use the JustFlightService's Dio instance to maintain session/cookies
       final justFlightDio = _justFlightService.getDioInstance();
@@ -50,7 +52,7 @@ class DownloadService {
         ),
       );
 
-      print('Download completed: $filePath');
+      _logger.info('Download completed: $filePath');
 
       // Remove cancel token
       _downloadCancelTokens.remove(downloadUrl);
@@ -105,13 +107,13 @@ class DownloadService {
   }
 
   void cancelDownload(String downloadUrl) {
-    print('DEBUG: Cancelling download for URL: $downloadUrl');
+    _logger.debug('Cancelling download for URL: $downloadUrl');
     final cancelToken = _downloadCancelTokens[downloadUrl];
     if (cancelToken != null && !cancelToken.isCancelled) {
-      print('DEBUG: Found cancel token, cancelling...');
+      _logger.debug('Found cancel token, cancelling...');
       cancelToken.cancel('User cancelled download');
     } else {
-      print('DEBUG: No active cancel token found or already cancelled');
+      _logger.debug('No active cancel token found or already cancelled');
     }
   }
 

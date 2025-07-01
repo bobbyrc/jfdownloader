@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/download_provider.dart';
 import '../screens/product_details_screen.dart';
+import 'cached_network_image.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -31,12 +32,11 @@ class ProductCard extends StatelessWidget {
                 color: Theme.of(context).colorScheme.surfaceVariant,
               ),
               child: product.imageUrl.isNotEmpty
-                  ? Image.network(
-                      product.imageUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: product.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildPlaceholderImage(context);
-                      },
+                      placeholder: _buildPlaceholderImage(context),
+                      errorWidget: _buildPlaceholderImage(context),
                     )
                   : _buildPlaceholderImage(context),
             ),

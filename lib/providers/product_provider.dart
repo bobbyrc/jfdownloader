@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/product.dart';
 import '../services/justflight_service.dart';
+import '../services/logger_service.dart';
 
 class ProductProvider extends ChangeNotifier {
   final JustFlightService _justFlightService = JustFlightService();
+  final LoggerService _logger = LoggerService();
   
   List<Product> _products = [];
   bool _isLoading = false;
@@ -65,7 +67,7 @@ class ProductProvider extends ChangeNotifier {
         _products = await _justFlightService.getProducts(
           fetchImages: fetchImages,
           onProgressUpdate: (completed, total, message) {
-            print('🔄 Progress update: $completed/$total - $message');
+            _logger.debug('Progress update: $completed/$total - $message');
             if (completed == 0) {
               // Products are loaded, now starting image fetching
               _setLoading(false); // Turn off main loading, enable image progress
@@ -153,17 +155,17 @@ class ProductProvider extends ChangeNotifier {
   }
 
   void _startImageFetching(int total) {
-    print('📊 Starting image fetching: $total products');
+    _logger.info('Starting image fetching: $total products');
     _setImageFetchingProgress(true, total, 0, 'Starting image fetching...');
   }
 
   void _updateImageProgress(int completed, int total, String message) {
-    print('📈 Updating progress: $completed/$total - $message');
+    _logger.debug('Updating progress: $completed/$total - $message');
     _setImageFetchingProgress(true, total, completed, message);
   }
 
   void _finishImageFetching() {
-    print('✅ Finishing image fetching');
+    _logger.info('Finishing image fetching');
     _setImageFetchingProgress(false, _totalProducts, _totalProducts, 'Image fetching complete!');
   }
 }

@@ -9,6 +9,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../models/product.dart';
+import 'logger_service.dart';
 
 class JustFlightService {
   static final JustFlightService _instance = JustFlightService._internal();
@@ -18,6 +19,7 @@ class JustFlightService {
   late Dio _dio;
   late CookieJar _cookieJar;
   bool _initialized = false;
+  final LoggerService _logger = LoggerService();
 
   static const String baseUrl = 'https://www.justflight.com';
   static const String loginUrl = '$baseUrl/account/login';
@@ -37,8 +39,8 @@ class JustFlightService {
     
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(minutes: 1),
+      connectTimeout: const Duration(seconds: 15), // Reduced from 30s for faster feedback
+      receiveTimeout: const Duration(seconds: 30), // Reduced from 60s
       validateStatus: (status) => status != null && status < 400,
       followRedirects: true,
       maxRedirects: 5,
@@ -58,11 +60,12 @@ class JustFlightService {
       },
     ));
 
-    // Configure connection pool for reasonable concurrent performance
+    // Configure connection pool for optimal performance
     (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
       final client = HttpClient();
-      client.maxConnectionsPerHost = 3; // Reduce concurrent connections to avoid server overload
-      client.idleTimeout = const Duration(seconds: 30);
+      client.maxConnectionsPerHost = 4; // Optimized for concurrent image fetching
+      client.idleTimeout = const Duration(seconds: 20); // Balanced timeout
+      client.connectionTimeout = const Duration(seconds: 10); // Faster connection setup
       return client;
     };
 
@@ -85,18 +88,18 @@ class JustFlightService {
     await _initialize();
 
     try {
-      print('Attempting to login to JustFlight...');
+      _logger.info('Attempting to login to JustFlight...');
       
       // First, get the login page to extract any CSRF tokens or hidden fields
       final loginPageResponse = await _dio.get(loginUrl);
       final loginDocument = html_parser.parse(loginPageResponse.data);
       
-      print('Login page loaded, parsing form...');
+      _logger.debug('Login page loaded, parsing form...');
 
       // Use the same robust form detection as debugLoginPage
       final forms = loginDocument.querySelectorAll('form');
       if (forms.isEmpty) {
-        print('No forms found on page');
+        _logger.warning('No forms found on page');
         return false;
       }
 
@@ -144,11 +147,11 @@ class JustFlightService {
       }
 
       if (loginForm == null || emailFieldName == null || passwordFieldName == null) {
-        print('Could not find login form with email/password fields');
+        _logger.error('Could not find login form with email/password fields');
         return false;
       }
 
-      print('Using email field: $emailFieldName, password field: $passwordFieldName');
+      _logger.debug('Using email field: $emailFieldName, password field: $passwordFieldName');
 
       // Extract all hidden inputs and form tokens
       final hiddenInputs = loginForm.querySelectorAll('input[type="hidden"]');
@@ -159,7 +162,7 @@ class JustFlightService {
         final value = input.attributes['value'];
         if (name != null && value != null) {
           loginData[name] = value;
-          print('Found hidden field: $name = ${value.length > 50 ? '${value.substring(0, 50)}...' : value}');
+          _logger.debug('Found hidden field: $name = ${value.length > 50 ? '${value.substring(0, 50)}...' : value}');
         }
       }
 
@@ -172,7 +175,7 @@ class JustFlightService {
         loginData[submitFieldName] = submitFieldValue;
       }
 
-      print('Login data prepared: ${loginData.keys.join(', ')}');
+      _logger.debug('Login data prepared: ${loginData.keys.join(', ')}');
 
       // Get the form action URL
       String actionUrl = loginForm.attributes['action'] ?? '';
@@ -190,7 +193,7 @@ class JustFlightService {
         }
       }
 
-      print('Submitting to: $actionUrl');
+      _logger.debug('Submitting to: $actionUrl');
 
       // Submit login form with manual redirect handling for better cookie preservation
       final loginResponse = await _dio.post(
@@ -202,12 +205,12 @@ class JustFlightService {
         ),
       );
 
-      print('Login response status: ${loginResponse.statusCode}');
+      _logger.debug('Login response status: ${loginResponse.statusCode}');
       
       // Handle redirects manually to ensure cookies are preserved
       if (loginResponse.statusCode == 302 || loginResponse.statusCode == 301) {
         final location = loginResponse.headers.value('location');
-        print('Login got redirect to: $location');
+        _logger.debug('Login got redirect to: $location');
         
         if (location != null) {
           // Follow redirects manually in a loop to handle multiple redirects
@@ -225,26 +228,26 @@ class JustFlightService {
               }
             }
             
-            print('Following redirect ${redirectCount + 1} to: $currentUrl');
+            _logger.debug('Following redirect ${redirectCount + 1} to: $currentUrl');
             final redirectResponse = await _dio.get(
               currentUrl,
               options: Options(followRedirects: false),
             );
             
-            print('Redirect response status: ${redirectResponse.statusCode}');
-            print('Response URL: ${redirectResponse.realUri}');
+            _logger.debug('Redirect response status: ${redirectResponse.statusCode}');
+            _logger.debug('Response URL: ${redirectResponse.realUri}');
             
             // Check if this is the final page (no more redirects)
             if (redirectResponse.statusCode == 200) {
               final finalUrl = redirectResponse.realUri.toString();
               if (finalUrl.contains('/account') && !finalUrl.contains('login')) {
-                print('Login successful - reached account page after ${redirectCount + 1} redirects');
+                _logger.info('Login successful - reached account page after ${redirectCount + 1} redirects');
                 return true;
               } else if (finalUrl.contains('login')) {
-                print('Login failed - redirected back to login page');
+                _logger.warning('Login failed - redirected back to login page');
                 return false;
               } else {
-                print('Unexpected final page: $finalUrl');
+                _logger.warning('Unexpected final page: $finalUrl');
                 return false;
               }
             }
@@ -255,44 +258,44 @@ class JustFlightService {
               if (nextLocation != null) {
                 currentUrl = nextLocation;
                 redirectCount++;
-                print('Got another redirect to: $nextLocation');
+                _logger.debug('Got another redirect to: $nextLocation');
               } else {
-                print('Redirect response but no location header');
+                _logger.warning('Redirect response but no location header');
                 return false;
               }
             } else {
-              print('Unexpected status code: ${redirectResponse.statusCode}');
+              _logger.warning('Unexpected status code: ${redirectResponse.statusCode}');
               return false;
             }
           }
           
-          print('Too many redirects (${redirectCount})');
+          _logger.warning('Too many redirects ($redirectCount)');
           return false;
         } else {
-          print('No location header in redirect response');
+          _logger.warning('No location header in redirect response');
           return false;
         }
       } else {
-        print('No redirect received, checking response content...');
+        _logger.debug('No redirect received, checking response content...');
         final finalUrl = loginResponse.realUri.toString();
         if (finalUrl.contains('/account') && !finalUrl.contains('login')) {
-          print('Login successful - already on account page');
+          _logger.info('Login successful - already on account page');
           return true;
         } else if (finalUrl.contains('login')) {
-          print('Login failed - still on login page');
+          _logger.warning('Login failed - still on login page');
           return false;
         }
       }
 
       // Check if login was successful
       final loginSuccess = await isLoggedIn();
-      print('Login success: $loginSuccess');
+      _logger.info('Login success: $loginSuccess');
       return loginSuccess;
       
     } catch (e) {
-      print('Login error: $e');
+      _logger.error('Login error', error: e);
       if (e is DioException) {
-        print('DioException details: ${e.response?.statusCode} - ${e.response?.data}');
+        _logger.error('DioException details: ${e.response?.statusCode} - ${e.response?.data}');
       }
       return false;
     }
@@ -492,24 +495,7 @@ class JustFlightService {
     }
   }
 
-  /// Helper method to fetch product image with error handling and logging
-  Future<Product> _fetchProductImageWithRetry(Product product, int index, int total) async {
-    try {
-      print('Fetching image for product $index/$total: ${product.name}');
-      
-      final imageUrl = await fetchProductPageImage(product.name);
-      if (imageUrl != null) {
-        print('✓ Found image for ${product.name}');
-        return product.copyWith(imageUrl: imageUrl);
-      } else {
-        print('✗ No image found for ${product.name}');
-        return product;
-      }
-    } catch (e) {
-      print('✗ Error fetching image for ${product.name}: $e');
-      return product;
-    }
-  }
+
 
   List<Product> _parseProductsFromHtml(dom.Document document) {
     final products = <Product>[];

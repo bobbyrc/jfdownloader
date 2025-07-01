@@ -6,6 +6,7 @@ import '../models/download_progress.dart';
 import '../providers/download_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/justflight_service.dart';
+import '../widgets/cached_network_image.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Product product;
@@ -259,12 +260,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             child: product.imageUrl.isNotEmpty
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      product.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: product.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildPlaceholderImage();
-                      },
+                      placeholder: _buildPlaceholderImage(),
+                      errorWidget: _buildPlaceholderImage(),
                     ),
                   )
                 : _buildPlaceholderImage(),
