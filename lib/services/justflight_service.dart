@@ -305,7 +305,7 @@ class JustFlightService {
     await _initialize();
 
     try {
-      print('Checking login status...');
+      _logger.debug('Checking login status...');
       final response = await _dio.get(accountUrl);
       final document = html_parser.parse(response.data);
       
@@ -338,8 +338,8 @@ class JustFlightService {
       final loggedInCount = indicators.where((i) => i).length;
       final isLoggedIn = loggedInCount >= 2; // Need at least 2 indicators
       
-      print('Login indicators found: $loggedInCount/9, logged in: $isLoggedIn');
-      print('Current URL: ${response.realUri}');
+      _logger.debug('Login indicators found: $loggedInCount/9, logged in: $isLoggedIn');
+      _logger.debug('Current URL: ${response.realUri}');
       
       // Additional check - try to access orders page
       if (isLoggedIn) {
@@ -349,18 +349,18 @@ class JustFlightService {
           
           // If we can access orders page without being redirected to login, we're logged in
           final ordersAccessible = !ordersResponse.realUri.toString().contains('login');
-          print('Orders page accessible: $ordersAccessible');
+          _logger.debug('Orders page accessible: $ordersAccessible');
           
           return ordersAccessible;
         } catch (e) {
-          print('Error accessing orders page: $e');
+          _logger.warning('Error accessing orders page: $e');
           return isLoggedIn;
         }
       }
       
       return isLoggedIn;
     } catch (e) {
-      print('Login check error: $e');
+      _logger.error('Login check error', error: e);
       return false;
     }
   }
@@ -372,7 +372,7 @@ class JustFlightService {
       // Clear cookies
       await _cookieJar.deleteAll();
     } catch (e) {
-      print('Logout error: $e');
+      _logger.error('Logout error', error: e);
     }
   }
 
@@ -389,13 +389,13 @@ class JustFlightService {
       // Cache the orders HTML and extract postback data for product details
       _cachedOrdersHtml = response.data;
       await _extractAndCachePostbackData(document);
-      print('Cached orders page data and postback information for ${_cachedPostbackData.length} products');
+      _logger.info('Cached orders page data and postback information for ${_cachedPostbackData.length} products');
       
       List<Product> products = _parseProductsFromHtml(document);
       
       // Optionally fetch high-quality images from product pages
       if (fetchImages) {
-        print('Fetching high-quality images for ${products.length} products concurrently...');
+        _logger.info('Fetching high-quality images for ${products.length} products concurrently...');
         
         // Report initial progress
         onProgressUpdate?.call(0, products.length, 'Starting image fetching...');
@@ -455,7 +455,7 @@ class JustFlightService {
         await streamSubscription.cancel();
         
         products = enhancedProducts;
-        print('Image fetching complete!');
+        _logger.info('Image fetching complete!');
         
         // Report completion
         onProgressUpdate?.call(products.length, products.length, 'Image fetching complete!');
@@ -463,7 +463,7 @@ class JustFlightService {
       
       return products;
     } catch (e) {
-      print('Get products error: $e');
+      _logger.error('Get products error', error: e);
       throw Exception('Failed to fetch products: $e');
     }
   }
@@ -476,20 +476,33 @@ class JustFlightService {
     StreamController<Product> resultChannel
   ) async {
     try {
-      print('Fetching image for product $index/$total: ${product.name}');
+      _logger.debug('Fetching image and category for product $index/$total: ${product.name}');
       
-      final imageUrl = await fetchProductPageImage(product.name);
-      if (imageUrl != null) {
-        print('✓ Found image for ${product.name}');
+      final result = await fetchProductImageAndCategory(product.name);
+      final imageUrl = result['imageUrl'];
+      final category = result['category'];
+      
+      if (imageUrl != null || category != null) {
+        _logger.debug('✓ Found ${imageUrl != null ? 'image' : ''}${imageUrl != null && category != null ? ' and ' : ''}${category != null ? 'category ($category)' : ''} for ${product.name}');
+        
+        // Update product with new information
+        var updatedProduct = product;
+        if (imageUrl != null) {
+          updatedProduct = updatedProduct.copyWith(imageUrl: imageUrl);
+        }
+        if (category != null) {
+          updatedProduct = updatedProduct.copyWith(category: category);
+        }
+        
         // Send enhanced product to channel
-        resultChannel.add(product.copyWith(imageUrl: imageUrl));
+        resultChannel.add(updatedProduct);
       } else {
-        print('✗ No image found for ${product.name}');
+        _logger.warning('✗ No image or category found for ${product.name}');
         // Send original product to channel
         resultChannel.add(product);
       }
     } catch (e) {
-      print('✗ Error fetching image for ${product.name}: $e');
+      _logger.error('✗ Error fetching image/category for ${product.name}', error: e);
       // Send original product to channel on error
       resultChannel.add(product);
     }
@@ -500,30 +513,30 @@ class JustFlightService {
   List<Product> _parseProductsFromHtml(dom.Document document) {
     final products = <Product>[];
     
-    print('Parsing products from orders page...');
+    _logger.debug('Parsing products from orders page...');
     
     // Look for the orders table specifically
     final ordersTable = document.querySelector('#orders_table');
     if (ordersTable != null) {
-      print('Found orders table, parsing rows...');
+      _logger.debug('Found orders table, parsing rows...');
       
       // Get all table rows in the tbody
       final rows = ordersTable.querySelectorAll('tbody tr');
-      print('Found ${rows.length} order rows');
+      _logger.debug('Found ${rows.length} order rows');
       
       for (int i = 0; i < rows.length; i++) {
         try {
           final product = _parseOrderRow(rows[i], i);
           if (product != null) {
             products.add(product);
-            print('Parsed product: ${product.name}');
+            _logger.debug('Parsed product: ${product.name}');
           }
         } catch (e) {
-          print('Error parsing order row $i: $e');
+          _logger.warning('Error parsing order row $i: $e');
         }
       }
     } else {
-      print('Orders table not found, trying alternative selectors...');
+      _logger.debug('Orders table not found, trying alternative selectors...');
       
       // Fallback to original parsing logic
       final productElements = document.querySelectorAll('.product-item, .download-item, .downloadable-product');
@@ -535,12 +548,12 @@ class JustFlightService {
             products.add(product);
           }
         } catch (e) {
-          print('Error parsing product element: $e');
+          _logger.warning('Error parsing product element: $e');
         }
       }
     }
     
-    print('Parsed ${products.length} total products');
+    _logger.info('Parsed ${products.length} total products');
     return products;
   }
 
@@ -555,7 +568,7 @@ class JustFlightService {
     
     final cells = row.querySelectorAll('th, td');
     if (cells.length < 4) {
-      print('Row $index has insufficient columns: ${cells.length}');
+      _logger.debug('Row $index has insufficient columns: ${cells.length}');
       return null;
     }
     
@@ -565,7 +578,7 @@ class JustFlightService {
     final titleText = titleLink?.text.trim() ?? titleCell?.text.trim() ?? '';
     
     if (titleText.isEmpty) {
-      print('Row $index has no product title');
+      _logger.debug('Row $index has no product title');
       return null;
     }
     
@@ -622,7 +635,7 @@ class JustFlightService {
         // Try to parse the date - adjust format as needed
         purchaseDate = DateTime.tryParse(dateText);
       } catch (e) {
-        print('Could not parse date: $dateText');
+        _logger.warning('Could not parse date: $dateText');
       }
     }
     
@@ -766,6 +779,9 @@ class JustFlightService {
         .trim();
   }
 
+  /// Legacy category extraction method using keyword matching.
+  /// This is now primarily used as a fallback when breadcrumb data is not available.
+  /// The main category extraction now uses _extractCategoryFromBreadcrumbs which is more accurate.
   String _extractCategory(String name, String description) {
     final text = '$name $description'.toLowerCase();
     
@@ -774,7 +790,107 @@ class JustFlightService {
     if (text.contains('utility') || text.contains('tool')) return 'Utilities';
     if (text.contains('training') || text.contains('tutorial')) return 'Training';
     
-    return 'Software';
+    return 'Unknown';
+  }
+
+  /// Extract category from JustFlight product page breadcrumbs
+  /// Returns a more accurate category based on the navigation path
+  String _extractCategoryFromBreadcrumbs(dom.Document document) {
+    try {
+      // Look for the breadcrumbs panel
+      final breadcrumbsPanel = document.querySelector('#panelCrumbs');
+      if (breadcrumbsPanel == null) {
+        _logger.debug('No breadcrumbs panel found, falling back to basic extraction');
+        return 'Unknown';
+      }
+
+      // Get all breadcrumb links
+      final breadcrumbLinks = breadcrumbsPanel.querySelectorAll('a');
+      final breadcrumbTexts = breadcrumbLinks.map((link) => link.text.trim()).toList();
+      
+      _logger.debug('Found breadcrumbs: ${breadcrumbTexts.join(' > ')}');
+
+      // Map specific JustFlight breadcrumb categories to canonical categories
+      for (final breadcrumb in breadcrumbTexts) {
+        final breadcrumbLower = breadcrumb.toLowerCase();
+        
+        // Direct mapping from JustFlight categories
+        if (breadcrumbLower.contains('airliners')) {
+          return 'Aircraft';
+        }
+        
+        if (breadcrumbLower.contains('light aircraft')) {
+          return 'Aircraft';
+        }
+        
+        if (breadcrumbLower.contains('vintage aircraft')) {
+          return 'Aircraft';
+        }
+        
+        if (breadcrumbLower.contains('military')) {
+          return 'Aircraft';
+        }
+        
+        if (breadcrumbLower.contains('scenery and airports')) {
+          return 'Scenery';
+        }
+        
+        if (breadcrumbLower.contains('tools & utilities')) {
+          return 'Utilities';
+        }
+        
+        if (breadcrumbLower.contains('mission packs')) {
+          return 'Missions';
+        }
+        
+        if (breadcrumbLower.contains('traffic ai')) {
+          return 'Traffic';
+        }
+        
+        if (breadcrumbLower.contains('management')) {
+          return 'Management';
+        }
+        
+        if (breadcrumbLower.contains('just flight products')) {
+          return 'Just Flight';
+        }
+      }
+
+      // Fallback: Check for partial matches in case of slight variations
+      final fullPath = breadcrumbTexts.join(' ').toLowerCase();
+      
+      if (fullPath.contains('aircraft') || fullPath.contains('airliners') || 
+          fullPath.contains('vintage') || fullPath.contains('military')) {
+        return 'Aircraft';
+      }
+      
+      if (fullPath.contains('scenery') || fullPath.contains('airports')) {
+        return 'Scenery';
+      }
+      
+      if (fullPath.contains('tools') || fullPath.contains('utilities')) {
+        return 'Utilities';
+      }
+      
+      if (fullPath.contains('mission') || fullPath.contains('missions')) {
+        return 'Missions';
+      }
+      
+      if (fullPath.contains('traffic')) {
+        return 'Traffic';
+      }
+      
+      if (fullPath.contains('management')) {
+        return 'Management';
+      }
+
+      _logger.debug('No specific category found in breadcrumbs, marking as Unknown');
+      return 'Unknown';
+      
+    } catch (e) {
+      _logger.warning('Error extracting category from breadcrumbs: $e');
+      return 'Unknown';
+    }
   }
 
   String _extractFileType(String url) {
@@ -823,7 +939,7 @@ class JustFlightService {
 
       return productFileUrl;
     } catch (e) {
-      print('Get download URL error: $e');
+      _logger.error('Get download URL error', error: e);
       return productFileUrl;
     }
   }
@@ -837,16 +953,16 @@ class JustFlightService {
   Map<String, Map<String, String>> _cachedPostbackData = {};
 
   Future<Map<String, dynamic>> getProductDetails(String productId) async {
-    print('\n=== getProductDetails called ===');
-    print('Product ID: $productId');
+    _logger.debug('=== getProductDetails called ===');
+    _logger.debug('Product ID: $productId');
     
     try {
-      print('\n=== Fetching Product Details ===');
-      print('Product ID: $productId');
+      _logger.debug('=== Fetching Product Details ===');
+      _logger.debug('Product ID: $productId');
 
       // Check if we have cached postback data for this product
       if (_cachedPostbackData.containsKey(productId)) {
-        print('Using cached postback data for product: $productId');
+        _logger.debug('Using cached postback data for product: $productId');
         final postbackData = _cachedPostbackData[productId]!;
         return await _submitProductPostback(
           postbackData['target']!,
@@ -862,10 +978,10 @@ class JustFlightService {
       // If no cached data, try to use cached orders HTML or fetch fresh
       dom.Document ordersDoc;
       if (_cachedOrdersHtml != null) {
-        print('Using cached orders HTML to extract postback data...');
+        _logger.debug('Using cached orders HTML to extract postback data...');
         ordersDoc = html_parser.parse(_cachedOrdersHtml!);
       } else {
-        print('No cached data found, fetching fresh orders page...');
+        _logger.debug('No cached data found, fetching fresh orders page...');
         final ordersResponse = await _dio.get('$baseUrl/account/orders');
         ordersDoc = html_parser.parse(ordersResponse.data);
         _cachedOrdersHtml = ordersResponse.data;
@@ -876,7 +992,7 @@ class JustFlightService {
 
       // Now try to get the specific product data
       if (_cachedPostbackData.containsKey(productId)) {
-        print('Found product in cached/fresh data');
+        _logger.debug('Found product in cached/fresh data');
         final postbackData = _cachedPostbackData[productId]!;
         return await _submitProductPostback(
           postbackData['target']!,
@@ -892,13 +1008,13 @@ class JustFlightService {
       }
 
     } catch (e) {
-      print('Error fetching product details: $e');
+      _logger.error('Error fetching product details', error: e);
       rethrow;
     }
   }
 
   Future<void> _extractAndCachePostbackData(dom.Document ordersDoc) async {
-    print('Extracting and caching postback data for all products...');
+    _logger.debug('Extracting and caching postback data for all products...');
     
     // Find the orders table
     final ordersTable = ordersDoc.querySelector('table');
@@ -907,7 +1023,7 @@ class JustFlightService {
     }
     
     final tableRows = ordersTable.querySelectorAll('tr');
-    print('Processing ${tableRows.length} table rows');
+    _logger.debug('Processing ${tableRows.length} table rows');
     
     // Extract form state once
     final viewStateElement = ordersDoc.querySelector('input[name="__VIEWSTATE"]');
@@ -969,7 +1085,7 @@ class JustFlightService {
                   'productName': title,
                 };
                 
-                print('Cached postback data for: $title (ID: $productId)');
+                _logger.debug('Cached postback data for: $title (ID: $productId)');
                 break;
               }
             }
@@ -978,7 +1094,7 @@ class JustFlightService {
       }
     }
     
-    print('Cached postback data for ${_cachedPostbackData.length} products');
+    _logger.debug('Cached postback data for ${_cachedPostbackData.length} products');
   }
 
   Future<Map<String, dynamic>> _submitProductPostback(
@@ -990,10 +1106,10 @@ class JustFlightService {
     String productName,
     String orderNumber, // Add order number parameter
   ) async {
-    print('Submitting postback for product: $productName');
-    print('ViewState length: ${viewState.length}');
-    print('ViewStateGenerator: $viewStateGenerator');
-    print('EventValidation length: ${eventValidation.length}');
+    _logger.debug('Submitting postback for product: $productName');
+    _logger.debug('ViewState length: ${viewState.length}');
+    _logger.debug('ViewStateGenerator: $viewStateGenerator');
+    _logger.debug('EventValidation length: ${eventValidation.length}');
     
     // Submit the postback to get the product-specific page
     final formData = {
@@ -1004,7 +1120,7 @@ class JustFlightService {
       '__EVENTVALIDATION': eventValidation,
     };
     
-    print('Submitting postback to orders page...');
+    _logger.debug('Submitting postback to orders page...');
     final productResponse = await _dio.post(
       '$baseUrl/account/orders',
       data: formData,
@@ -1032,7 +1148,7 @@ class JustFlightService {
             : '$baseUrl/$redirectUrl';
       }
       
-      print('Following postback redirect ${redirectCount + 1}: $redirectUrl');
+      _logger.debug('Following postback redirect ${redirectCount + 1}: $redirectUrl');
       
       currentResponse = await _dio.get(
         redirectUrl,
@@ -1045,8 +1161,8 @@ class JustFlightService {
       redirectCount++;
     }
     
-    print('Product details response status: ${currentResponse.statusCode}');
-    print('Final URL: ${currentResponse.realUri}');
+    _logger.debug('Product details response status: ${currentResponse.statusCode}');
+    _logger.debug('Final URL: ${currentResponse.realUri}');
     
     if (currentResponse.statusCode != 200) {
       throw Exception('Failed to get product details page: ${currentResponse.statusCode}');
@@ -1054,17 +1170,17 @@ class JustFlightService {
 
     // Parse the product details page
     final detailsDoc = html_parser.parse(currentResponse.data);
-    print('Successfully loaded product-specific details page');
+    _logger.debug('Successfully loaded product-specific details page');
 
     // Extract detailed product information
     final result = _parseProductDetailsPage(detailsDoc, orderNumber); // Pass the correct order number
     
-    print('Parsed product details: ${result.keys.toList()}');
+    _logger.debug('Parsed product details: ${result.keys.toList()}');
     return result;
   }
 
   Map<String, dynamic> _parseProductDetailsPage(dom.Document document, String orderNumber) {
-    print('\n=== Parsing Product Details Page ===');
+    _logger.debug('=== Parsing Product Details Page ===');
 
     // Look for the product information
     Product? detailedProduct;
@@ -1083,7 +1199,7 @@ class JustFlightService {
     final description = descriptionElement?.text.trim() ?? '';
 
     // Use the passed order number directly (it's already the correct JFL order number)
-    print('Using order number: $orderNumber');
+    _logger.debug('Using order number: $orderNumber');
 
     // Extract purchase date from the page (look for more recent dates)
     DateTime? purchaseDate;
@@ -1091,17 +1207,17 @@ class JustFlightService {
     
     // Look for date patterns in the content - prioritize more recent dates
     final pageText = document.body?.text ?? '';
-    print('Searching for dates in page content (${pageText.length} chars)...');
+    _logger.debug('Searching for dates in page content (${pageText.length} chars)...');
     
     final dateMatches = RegExp(r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})').allMatches(pageText);
     
-    print('Found ${dateMatches.length} date matches in page content');
+    _logger.debug('Found ${dateMatches.length} date matches in page content');
     List<DateTime> validDates = [];
     
     for (final match in dateMatches) {
       try {
         final dateStr = match.group(1)!;
-        print('Checking date: $dateStr');
+        _logger.debug('Checking date: $dateStr');
         final parts = dateStr.split(RegExp(r'[\/\-]'));
         if (parts.length == 3) {
           // Determine the date format by checking the values
@@ -1159,14 +1275,14 @@ class JustFlightService {
           // Only accept dates from 2010 onwards (reasonable for software purchases)
           if (parsedDate.year >= 2010 && parsedDate.year <= DateTime.now().year + 10) {
             validDates.add(parsedDate);
-            print('Valid date found: $parsedDate');
+            _logger.debug('Valid date found: $parsedDate');
           } else {
-            print('Date out of range: $parsedDate');
+            _logger.debug('Date out of range: $parsedDate');
           }
         }
       } catch (e) {
         // Skip invalid dates
-        print('Could not parse date: ${match.group(1)} - $e');
+        _logger.warning('Could not parse date: ${match.group(1)} - $e');
         continue;
       }
     }
@@ -1175,13 +1291,13 @@ class JustFlightService {
     if (validDates.isNotEmpty) {
       validDates.sort((a, b) => b.compareTo(a)); // Sort descending (most recent first)
       purchaseDate = validDates.first;
-      print('Selected most recent purchase date: $purchaseDate');
+      _logger.debug('Selected most recent purchase date: $purchaseDate');
     } else {
-      print('No valid purchase dates found');
+      _logger.debug('No valid purchase dates found');
     }
     
     // Look for version information
-    print('Looking for version information in page content...');
+    _logger.debug('Looking for version information in page content...');
     
     // Try multiple version patterns, including versions from file names
     List<String> versionCandidates = [];
@@ -1190,14 +1306,14 @@ class JustFlightService {
     final versionMatch1 = RegExp(r'[vV]ersion\s*:?\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)').firstMatch(pageText);
     if (versionMatch1 != null) {
       versionCandidates.add(versionMatch1.group(1)!);
-      print('Found version pattern 1: ${versionMatch1.group(1)}');
+      _logger.debug('Found version pattern 1: ${versionMatch1.group(1)}');
     }
     
     // Pattern 2: vX.X.X
     final versionMatch2 = RegExp(r'[vV](\d+\.\d+(?:\.\d+)?)').firstMatch(pageText);
     if (versionMatch2 != null) {
       versionCandidates.add(versionMatch2.group(1)!);
-      print('Found version pattern 2: ${versionMatch2.group(1)}');
+      _logger.debug('Found version pattern 2: ${versionMatch2.group(1)}');
     }
     
     // Pattern 3: X.X.X (standalone)
@@ -1213,7 +1329,7 @@ class JustFlightService {
         if (major != null && minor != null && patch != null && 
             major >= 0 && major <= 99 && minor >= 0 && minor <= 99 && patch >= 0 && patch <= 999) {
           versionCandidates.add(candidate);
-          print('Found version pattern 3: $candidate');
+          _logger.debug('Found version pattern 3: $candidate');
         }
       }
     }
@@ -1221,15 +1337,15 @@ class JustFlightService {
     // Use the first reasonable version found
     if (versionCandidates.isNotEmpty) {
       version = versionCandidates.first;
-      print('Selected version: $version');
+      _logger.debug('Selected version: $version');
     } else {
-      print('No version pattern found in page content');
+      _logger.debug('No version pattern found in page content');
     }
 
     // Look for the specific download links table
     final downloadTable = document.querySelector('table#downloadLinks');
     if (downloadTable != null) {
-      print('Found downloadLinks table');
+      _logger.debug('Found downloadLinks table');
       
       final rows = downloadTable.querySelectorAll('tr');
       for (final row in rows) {
@@ -1284,17 +1400,17 @@ class JustFlightService {
                 sizeInMB: 0, // Size will be determined during download
               ));
               
-              print('Found file: $fileName (Version: $version) -> $fullUrl');
+              _logger.debug('Found file: $fileName (Version: $version) -> $fullUrl');
             }
           }
         }
       }
     } else {
-      print('downloadLinks table not found, falling back to general search');
+      _logger.debug('downloadLinks table not found, falling back to general search');
       
       // Fallback: Look for any download links
       final downloadLinks = document.querySelectorAll('a[href*="download"], a[href*=".zip"], a[href*=".exe"], a[href*=".msi"]');
-      print('Found ${downloadLinks.length} potential download links');
+      _logger.debug('Found ${downloadLinks.length} potential download links');
 
       for (int i = 0; i < downloadLinks.length; i++) {
         final link = downloadLinks[i];
@@ -1329,7 +1445,7 @@ class JustFlightService {
             sizeInMB: 0, // Size will be determined during download
           ));
           
-          print('Found fallback file: $fileName -> $fullUrl');
+          _logger.debug('Found fallback file: $fileName -> $fullUrl');
         }
       }
     }
@@ -1355,7 +1471,7 @@ class JustFlightService {
         
         if (instructions.isNotEmpty) {
           installationInfo['Installation Instructions'] = instructions.join('\n');
-          print('Found setup guide with ${instructions.length} steps');
+          _logger.debug('Found setup guide with ${instructions.length} steps');
           foundInstallationInfo = true;
         }
       }
@@ -1438,8 +1554,8 @@ class JustFlightService {
       }
     }
 
-    print('Found ${installationInfo.length} installation info items');
-    print('Found ${downloadableFiles.length} downloadable files');
+    _logger.debug('Found ${installationInfo.length} installation info items');
+    _logger.debug('Found ${downloadableFiles.length} downloadable files');
 
     // Create detailed product with extracted information
     if (productName.isNotEmpty) {
@@ -1456,11 +1572,11 @@ class JustFlightService {
       );
     }
 
-    print('=== FINAL METADATA DEBUG ===');
-    print('Final orderNumber: $orderNumber');
-    print('Final purchaseDate: $purchaseDate');  
-    print('Final version: $version');
-    print('============================');
+    _logger.debug('=== FINAL METADATA DEBUG ===');
+    _logger.debug('Final orderNumber: $orderNumber');
+    _logger.debug('Final purchaseDate: $purchaseDate');  
+    _logger.debug('Final version: $version');
+    _logger.debug('============================');
 
     return {
       'product': detailedProduct,
@@ -1517,7 +1633,7 @@ class JustFlightService {
         final encodedQuery = Uri.encodeComponent(query);
         final searchUrl = 'https://www.justflight.com/searchresults?category=products&query=$encodedQuery';
         
-        print('Search attempt ${i + 1}/${searchQueries.length}: $searchUrl');
+        _logger.debug('Search attempt ${i + 1}/${searchQueries.length}: $searchUrl');
         
         final response = await _dio.get(
           searchUrl,
@@ -1534,7 +1650,7 @@ class JustFlightService {
           if (searchGrid != null) {
             // Look for search items (div.searchedItem)
             final searchItems = searchGrid.querySelectorAll('div.searchedItem');
-            print('Found ${searchItems.length} search results');
+            _logger.debug('Found ${searchItems.length} search results');
             
             if (searchItems.isNotEmpty) {
               final result = _findBestMatch(searchItems, productName, query);
@@ -1548,19 +1664,19 @@ class JustFlightService {
         // Try next search query without delay (server-friendly)
       }
       
-      print('No product found after trying all search strategies');
+      _logger.warning('No product found after trying all search strategies');
       return null;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionTimeout) {
-        print('Timeout searching for product $productName: ${e.message}');
+        _logger.warning('Timeout searching for product $productName: ${e.message}');
       } else if (e.response?.statusCode == 500) {
-        print('Server error (500) searching for product $productName - server may be overloaded');
+        _logger.warning('Server error (500) searching for product $productName - server may be overloaded');
       } else {
-        print('Network error searching for product $productName: ${e.message}');
+        _logger.warning('Network error searching for product $productName: ${e.message}');
       }
       return null;
     } catch (e) {
-      print('Error searching for product $productName: $e');
+      _logger.error('Error searching for product $productName', error: e);
       return null;
     }
   }
@@ -1646,7 +1762,7 @@ class JustFlightService {
           final href = productLink.attributes['href'];
           final linkText = productLink.text.trim();
           
-          print('Found product link: "$linkText" -> $href');
+          _logger.debug('Found product link: "$linkText" -> $href');
           
           if (href != null) {
             // Store first result as fallback
@@ -1657,14 +1773,14 @@ class JustFlightService {
             // Calculate matching score
             final score = _calculateMatchScore(originalProductName, linkText, searchQuery);
             
-            print('Match score for "$linkText": $score');
+            _logger.debug('Match score for "$linkText": $score');
             
             if (score > bestScore) {
               bestScore = score;
               bestMatch = _convertToAbsoluteUrl(href);
-              print('✓ New best match: "$linkText" (score: $score)');
+              _logger.debug('✓ New best match: "$linkText" (score: $score)');
             } else {
-              print('✗ Lower score: "$linkText" (score: $score)');
+              _logger.debug('✗ Lower score: "$linkText" (score: $score)');
             }
           }
         }
@@ -1675,7 +1791,7 @@ class JustFlightService {
     if (bestScore >= 2) {
       return bestMatch;
     } else if (fallbackMatch != null) {
-      print('⚠️ Using fallback match (best score was $bestScore)');
+      _logger.warning('⚠️ Using fallback match (best score was $bestScore)');
       return fallbackMatch;
     }
     
@@ -1747,12 +1863,12 @@ class JustFlightService {
       // First, search for the product to get the correct URL
       final productUrl = await _searchForProductUrl(productName);
       if (productUrl == null) {
-        print('Could not find product URL for: $productName');
+        _logger.debug('Could not find product URL for: $productName');
         return null;
       }
       
-      print('Found product URL: $productUrl');
-      print('Fetching product page for image extraction...');
+      _logger.debug('Found product URL: $productUrl');
+      _logger.debug('Fetching product page for image extraction...');
       
       // Use shorter timeout for image fetching to avoid holding up the queue
       final response = await _dio.get(
@@ -1799,23 +1915,23 @@ class JustFlightService {
           }
         }
         
-        print('No suitable product image found on page');
+        _logger.debug('No suitable product image found on page');
         return null;
       } else {
-        print('Failed to fetch product page: ${response.statusCode}');
+        _logger.warning('Failed to fetch product page: ${response.statusCode}');
         return null;
       }
     } on DioException catch (e) {
       if (e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionTimeout) {
-        print('Timeout fetching product page image for $productName: ${e.message}');
+        _logger.warning('Timeout fetching product page image for $productName: ${e.message}');
       } else if (e.response?.statusCode == 500) {
-        print('Server error (500) fetching product page for $productName - server may be overloaded');
+        _logger.warning('Server error (500) fetching product page for $productName - server may be overloaded');
       } else {
-        print('Network error fetching product page image for $productName: ${e.message}');
+        _logger.warning('Network error fetching product page image for $productName: ${e.message}');
       }
       return null;
     } catch (e) {
-      print('Error fetching product page image for $productName: $e');
+      _logger.error('Error fetching product page image for $productName', error: e);
       return null;
     }
   }
@@ -1826,7 +1942,7 @@ class JustFlightService {
       await _initialize();
       
       String productUrl = _generateProductUrl(productName);
-      print('Fetching product info from: $productUrl');
+      _logger.debug('Fetching product info from: $productUrl');
       
       Response response;
       try {
@@ -1835,7 +1951,7 @@ class JustFlightService {
         // If it's an MSFS product and the standard URL fails, try the -msfs suffix
         if (productName.contains('(MSFS)') && productUrl.contains('-microsoft-flight-simulator')) {
           final fallbackUrl = productUrl.replaceAll('-microsoft-flight-simulator', '-msfs');
-          print('Primary URL failed, trying fallback: $fallbackUrl');
+          _logger.debug('Primary URL failed, trying fallback: $fallbackUrl');
           response = await _dio.get(fallbackUrl);
         } else {
           rethrow;
@@ -1872,11 +1988,11 @@ class JustFlightService {
         
         return info;
       } else {
-        print('Failed to fetch product page info: ${response.statusCode}');
+        _logger.warning('Failed to fetch product page info: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching product page info: $e');
+      _logger.error('Error fetching product page info', error: e);
       return null;
     }
   }
@@ -1958,6 +2074,103 @@ class JustFlightService {
       
     } catch (e) {
       print('Debug error: $e');
+    }
+  }
+
+  /// Fetch both product image URL and category from the product page
+  /// Returns a map with 'imageUrl' and 'category' keys
+  Future<Map<String, String?>> fetchProductImageAndCategory(String productName) async {
+    try {
+      await _initialize();
+      
+      // First, search for the product to get the correct URL
+      final productUrl = await _searchForProductUrl(productName);
+      if (productUrl == null) {
+        _logger.debug('Could not find product URL for: $productName');
+        return {'imageUrl': null, 'category': null};
+      }
+      
+      _logger.debug('Found product URL: $productUrl');
+      _logger.debug('Fetching product page for image and category extraction...');
+      
+      // Use shorter timeout for fetching to avoid holding up the queue
+      final response = await _dio.get(
+        productUrl,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15), // Shorter timeout
+          sendTimeout: const Duration(seconds: 10),
+        ),
+      );
+      
+      if (response.statusCode == 200) {
+        final document = html_parser.parse(response.data);
+        
+        // Extract category from breadcrumbs
+        final category = _extractCategoryFromBreadcrumbs(document);
+        
+        // Extract image URL
+        String? imageUrl;
+        
+        // Look for the fancyPackShot image
+        final fancyPackShot = document.getElementById('fancyPackShot');
+        if (fancyPackShot != null) {
+          final href = fancyPackShot.attributes['href'];
+          if (href != null) {
+            // Handle both absolute and relative URLs
+            if (href.startsWith('//')) {
+              imageUrl = 'https:$href';
+            } else if (href.startsWith('/')) {
+              imageUrl = '$baseUrl$href';
+            } else if (href.startsWith('http')) {
+              imageUrl = href;
+            } else {
+              imageUrl = '$baseUrl/$href';
+            }
+          }
+        }
+        
+        // Fallback: look for other product images if fancyPackShot is not found
+        if (imageUrl == null) {
+          final productImages = document.querySelectorAll('img.artwork, .prodImageFloatRight img, img[alt*="aircraft"], img[alt*="plane"]');
+          for (final img in productImages) {
+            final src = img.attributes['src'];
+            if (src != null && src.contains('productimages')) {
+              if (src.startsWith('//')) {
+                imageUrl = 'https:$src';
+                break;
+              } else if (src.startsWith('/')) {
+                imageUrl = '$baseUrl$src';
+                break;
+              } else if (src.startsWith('http')) {
+                imageUrl = src;
+                break;
+              }
+            }
+          }
+        }
+        
+        _logger.debug('Extracted category: $category, imageUrl: ${imageUrl != null ? 'found' : 'not found'}');
+        
+        return {
+          'imageUrl': imageUrl, 
+          'category': category,
+        };
+      } else {
+        _logger.warning('Failed to fetch product page: ${response.statusCode}');
+        return {'imageUrl': null, 'category': null};
+      }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionTimeout) {
+        _logger.warning('Timeout fetching product page for $productName: ${e.message}');
+      } else if (e.response?.statusCode == 500) {
+        _logger.warning('Server error (500) fetching product page for $productName - server may be overloaded');
+      } else {
+        _logger.warning('Network error fetching product page for $productName: ${e.message}');
+      }
+      return {'imageUrl': null, 'category': null};
+    } catch (e) {
+      _logger.error('Error fetching product page for $productName', error: e);
+      return {'imageUrl': null, 'category': null};
     }
   }
 }
