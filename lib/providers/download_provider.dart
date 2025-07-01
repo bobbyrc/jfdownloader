@@ -66,7 +66,15 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   Future<void> _processDownloadQueue() async {
-    if (_isDownloading || _downloadQueue.isEmpty) return;
+    // Don't process if queue is empty
+    if (_downloadQueue.isEmpty) {
+      // Check if all downloads are complete
+      if (activeDownloads.isEmpty) {
+        _isDownloading = false;
+      }
+      notifyListeners();
+      return;
+    }
     
     _isDownloading = true;
     
@@ -87,10 +95,42 @@ class DownloadProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _formatErrorMessage(Object error) {
+    final errorStr = error.toString();
+    
+    // Remove "Exception:" prefix if present
+    String cleanError = errorStr;
+    if (cleanError.startsWith('Exception: ')) {
+      cleanError = cleanError.substring(11);
+    }
+    
+    // Map technical errors to user-friendly messages
+    if (cleanError.toLowerCase().contains('cancelled')) {
+      return 'Download cancelled';
+    } else if (cleanError.toLowerCase().contains('timeout')) {
+      return 'Download timed out';
+    } else if (cleanError.toLowerCase().contains('connection')) {
+      return 'Connection failed';
+    } else if (cleanError.toLowerCase().contains('network')) {
+      return 'Network error';
+    } else if (cleanError.toLowerCase().contains('file not found')) {
+      return 'File not found on server';
+    } else if (cleanError.toLowerCase().contains('unauthorized')) {
+      return 'Authentication required';
+    } else if (cleanError.toLowerCase().contains('forbidden')) {
+      return 'Access denied';
+    } else {
+      return cleanError;
+    }
+  }
+
   Future<void> _startDownload(String fileId) async {
     final progress = _downloads[fileId];
     final file = _downloadFiles[fileId];
-    if (progress == null || file == null) return;
+    
+    if (progress == null || file == null) {
+      return;
+    }
 
     try {
       _downloads[fileId] = progress.copyWith(status: DownloadStatus.downloading);
@@ -118,11 +158,12 @@ class DownloadProvider extends ChangeNotifier {
         status: DownloadStatus.completed,
         progress: 1.0,
         endTime: DateTime.now(),
+        clearError: true,
       );
     } catch (e) {
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.failed,
-        error: e.toString(),
+        error: _formatErrorMessage(e),
         endTime: DateTime.now(),
       );
     }
@@ -152,35 +193,49 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   void cancelDownload(String fileId) {
+    print('DEBUG: cancelDownload called for fileId: $fileId');
     final progress = _downloads[fileId];
     final file = _downloadFiles[fileId];
+    
+    print('DEBUG: Found progress: ${progress != null}, status: ${progress?.status}');
+    print('DEBUG: Found file: ${file != null}');
     
     if (progress != null) {
       // Cancel the actual download operation if it's in progress
       if (file != null && progress.status == DownloadStatus.downloading) {
+        print('DEBUG: Cancelling active download via service');
         _downloadService.cancelDownload(file.downloadUrl);
       }
       
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.cancelled,
+        error: 'Download cancelled',
         endTime: DateTime.now(),
       );
       _downloadQueue.remove(fileId);
+      print('DEBUG: Set status to cancelled, removed from queue');
       notifyListeners();
+    } else {
+      print('DEBUG: No progress found for fileId: $fileId');
     }
   }
 
   void retryDownload(String fileId) {
+    print('DEBUG: retryDownload called for fileId: $fileId');
     final progress = _downloads[fileId];
-    if (progress != null && progress.status == DownloadStatus.failed) {
+    print('DEBUG: Current progress status: ${progress?.status}, error: ${progress?.error}');
+    
+    if (progress != null && (progress.status == DownloadStatus.failed || progress.status == DownloadStatus.cancelled)) {
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.pending,
-        error: null,
         downloadedBytes: 0,
         progress: 0,
         startTime: DateTime.now(),
         endTime: null,
+        clearError: true,
       );
+      
+      print('DEBUG: Updated progress to pending, error cleared');
       
       if (!_downloadQueue.contains(fileId)) {
         _downloadQueue.add(fileId);
@@ -188,6 +243,8 @@ class DownloadProvider extends ChangeNotifier {
       
       notifyListeners();
       _processDownloadQueue();
+    } else {
+      print('DEBUG: Cannot retry - status: ${progress?.status}');
     }
   }
 

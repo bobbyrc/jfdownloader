@@ -1140,8 +1140,6 @@ class JustFlightService {
             final version = versionCell.text.trim();
             final dateAdded = dateAddedCell.text.trim();
             
-            print('DEBUG: Raw href = "$href"');
-            
             if (href.isNotEmpty && fileName.isNotEmpty) {
               // Construct proper full URL
               var fullUrl = href;
@@ -1150,7 +1148,6 @@ class JustFlightService {
                   // Special handling for productdownloads URLs - they need /account prefix
                   if (href.startsWith('/productdownloads/')) {
                     fullUrl = '$baseUrl/account$href';
-                    print('DEBUG: Fixed productdownloads URL: $fullUrl');
                   } else {
                     fullUrl = '$baseUrl$href';
                   }
@@ -1158,7 +1155,6 @@ class JustFlightService {
                   // Handle hrefs like "productdownloads/..." (no leading slash)
                   if (href.startsWith('productdownloads/')) {
                     fullUrl = '$baseUrl/account/$href';
-                    print('DEBUG: Fixed productdownloads URL (no slash): $fullUrl');
                   } else {
                     fullUrl = '$baseUrl/$href';
                   }
@@ -1167,7 +1163,6 @@ class JustFlightService {
                 // Even if it starts with http, check if it needs fixing
                 if (href.contains('/productdownloads/') && !href.contains('/account/productdownloads/')) {
                   fullUrl = href.replaceAll('/productdownloads/', '/account/productdownloads/');
-                  print('DEBUG: Fixed full URL: $fullUrl');
                 }
               }
               

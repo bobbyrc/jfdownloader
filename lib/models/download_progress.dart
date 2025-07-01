@@ -39,6 +39,7 @@ class DownloadProgress {
     String? error,
     DateTime? startTime,
     DateTime? endTime,
+    bool clearError = false,
   }) {
     return DownloadProgress(
       fileId: fileId ?? this.fileId,
@@ -47,7 +48,7 @@ class DownloadProgress {
       downloadedBytes: downloadedBytes ?? this.downloadedBytes,
       progress: progress ?? this.progress,
       status: status ?? this.status,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
     );

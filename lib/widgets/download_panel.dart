@@ -249,7 +249,7 @@ class _DownloadItem extends StatelessWidget {
                           .resumeDownload(download.fileId),
                       child: const Text('Resume'),
                     ),
-                  if (download.status == DownloadStatus.failed)
+                  if (download.status == DownloadStatus.failed || download.status == DownloadStatus.cancelled)
                     TextButton(
                       onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
                           .retryDownload(download.fileId),
@@ -278,12 +278,11 @@ class _DownloadItem extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         );
       case DownloadStatus.downloading:
-        return SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            value: download.progress,
+        return Text(
+          '${(download.progress * 100).toInt()}%',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.primary,
           ),
         );
       case DownloadStatus.completed:

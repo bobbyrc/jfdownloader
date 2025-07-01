@@ -42,7 +42,7 @@ class DownloadService {
           if (onProgress != null && total != -1) {
             onProgress(downloaded, total);
           }
-          print('Download progress: ${downloaded}/${total} bytes');
+          // Progress is shown in UI, no need for console logging
         },
         options: Options(
           receiveTimeout: const Duration(minutes: 30),
@@ -105,9 +105,13 @@ class DownloadService {
   }
 
   void cancelDownload(String downloadUrl) {
+    print('DEBUG: Cancelling download for URL: $downloadUrl');
     final cancelToken = _downloadCancelTokens[downloadUrl];
     if (cancelToken != null && !cancelToken.isCancelled) {
+      print('DEBUG: Found cancel token, cancelling...');
       cancelToken.cancel('User cancelled download');
+    } else {
+      print('DEBUG: No active cancel token found or already cancelled');
     }
   }
 

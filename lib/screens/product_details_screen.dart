@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/product.dart';
+import '../models/download_progress.dart';
 import '../providers/download_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/justflight_service.dart';
@@ -562,42 +563,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  if (isDownloading)
-                    _buildDownloadProgress(progress)
-                  else
-                    ElevatedButton.icon(
-                      onPressed: isDownloaded ? null : () => _downloadFile(file),
-                      icon: Icon(isDownloaded ? Icons.check : Icons.download),
-                      label: Text(isDownloaded ? 'Downloaded' : 'Download'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDownloaded 
-                            ? Theme.of(context).colorScheme.surfaceVariant
-                            : null,
-                      ),
-                    ),
+                  _buildDownloadActions(file, progress),
                 ],
               ),
               
-              if (isDownloading) ...[
+              // Download progress and error display
+              if (progress != null) ...[
                 const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: progress.progress,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      progress.status.name.toUpperCase(),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      '${(progress.progress * 100).toInt()}%',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+                _buildDownloadStatus(progress),
               ],
             ],
           ),
@@ -607,22 +580,170 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _buildDownloadProgress(progress) {
-    return SizedBox(
-      width: 60,
-      child: Column(
-        children: [
-          CircularProgressIndicator(
+  Widget _buildDownloadActions(ProductFile file, DownloadProgress? progress) {
+    final isDownloaded = file.isDownloaded;
+    
+    if (progress == null) {
+      // No download in progress - show download button
+      return ElevatedButton.icon(
+        onPressed: isDownloaded ? null : () => _downloadFile(file),
+        icon: Icon(isDownloaded ? Icons.check : Icons.download),
+        label: Text(isDownloaded ? 'Downloaded' : 'Download'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isDownloaded 
+              ? Theme.of(context).colorScheme.surfaceVariant
+              : null,
+        ),
+      );
+    }
+
+    // Download in progress or completed - show status and actions
+    switch (progress.status) {
+      case DownloadStatus.downloading:
+        return IconButton(
+          onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+              .cancelDownload(file.id),
+          icon: const Icon(Icons.close),
+          tooltip: 'Cancel Download',
+        );
+      
+      case DownloadStatus.completed:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Completed',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
+        );
+      
+      case DownloadStatus.failed:
+      case DownloadStatus.cancelled:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+                  .retryDownload(file.id),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+                  .cancelDownload(file.id),
+              icon: const Icon(Icons.close),
+              tooltip: 'Remove',
+            ),
+          ],
+        );
+      
+      case DownloadStatus.pending:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            const Text('Queued'),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+                  .cancelDownload(file.id),
+              icon: const Icon(Icons.close),
+              tooltip: 'Cancel',
+            ),
+          ],
+        );
+      
+      case DownloadStatus.paused:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+                  .resumeDownload(file.id),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Resume'),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
+                  .cancelDownload(file.id),
+              icon: const Icon(Icons.close),
+              tooltip: 'Cancel',
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _buildDownloadStatus(DownloadProgress progress) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (progress.status == DownloadStatus.downloading) ...[
+          LinearProgressIndicator(
             value: progress.progress,
-            strokeWidth: 3,
+            backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
           ),
           const SizedBox(height: 4),
-          Text(
-            '${(progress.progress * 100).toInt()}%',
-            style: Theme.of(context).textTheme.bodySmall,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                progress.status.name.toUpperCase(),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Text(
+                '${(progress.progress * 100).toInt()}%',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ],
-      ),
+        
+        // Error message
+        if (progress.error != null)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    progress.error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -684,8 +805,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       if (selectedDirectory == null) return;
 
       final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+      final filesToDownload = _downloadableFiles.isNotEmpty ? _downloadableFiles : widget.product.files;
       
-      for (final file in _downloadableFiles.isNotEmpty ? _downloadableFiles : widget.product.files) {
+      for (final file in filesToDownload) {
         if (!file.isDownloaded) {
           await downloadProvider.downloadFile(file, selectedDirectory);
         }
