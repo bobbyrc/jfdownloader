@@ -14,7 +14,7 @@ class DownloadService {
   final Map<String, CancelToken> _downloadCancelTokens = {};
 
   Future<String> downloadFile(
-    String fileId,
+    String downloadUrl, // Now expects the actual download URL
     String fileName,
     {Function(int downloaded, int total)? onProgress}
   ) async {
@@ -25,13 +25,16 @@ class DownloadService {
 
       // Create cancel token for this download
       final cancelToken = CancelToken();
-      _downloadCancelTokens[fileId] = cancelToken;
+      _downloadCancelTokens[downloadUrl] = cancelToken;
 
-      // Get the actual download URL
-      final downloadUrl = await _justFlightService.getDownloadUrl(fileId);
+      print('Starting download: $downloadUrl');
+      print('Saving to: $filePath');
 
-      // Download the file
-      await _dio.download(
+      // Use the JustFlightService's Dio instance to maintain session/cookies
+      final justFlightDio = _justFlightService.getDioInstance();
+      
+      // Download the file using the authenticated session
+      await justFlightDio.download(
         downloadUrl,
         filePath,
         cancelToken: cancelToken,
@@ -39,24 +42,22 @@ class DownloadService {
           if (onProgress != null && total != -1) {
             onProgress(downloaded, total);
           }
+          print('Download progress: ${downloaded}/${total} bytes');
         },
         options: Options(
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': '*/*',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-          },
           receiveTimeout: const Duration(minutes: 30),
+          validateStatus: (status) => status! < 400,
         ),
       );
 
+      print('Download completed: $filePath');
+
       // Remove cancel token
-      _downloadCancelTokens.remove(fileId);
+      _downloadCancelTokens.remove(downloadUrl);
 
       return filePath;
     } on DioException catch (e) {
-      _downloadCancelTokens.remove(fileId);
+      _downloadCancelTokens.remove(downloadUrl);
       
       if (e.type == DioExceptionType.cancel) {
         throw Exception('Download cancelled');
@@ -68,7 +69,7 @@ class DownloadService {
         throw Exception('Download failed: ${e.message}');
       }
     } catch (e) {
-      _downloadCancelTokens.remove(fileId);
+      _downloadCancelTokens.remove(downloadUrl);
       throw Exception('Download failed: $e');
     }
   }
@@ -103,8 +104,8 @@ class DownloadService {
     return downloadDir.path;
   }
 
-  void cancelDownload(String fileId) {
-    final cancelToken = _downloadCancelTokens[fileId];
+  void cancelDownload(String downloadUrl) {
+    final cancelToken = _downloadCancelTokens[downloadUrl];
     if (cancelToken != null && !cancelToken.isCancelled) {
       cancelToken.cancel('User cancelled download');
     }

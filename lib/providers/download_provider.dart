@@ -7,6 +7,7 @@ class DownloadProvider extends ChangeNotifier {
   final DownloadService _downloadService = DownloadService();
   
   final Map<String, DownloadProgress> _downloads = {};
+  final Map<String, ProductFile> _downloadFiles = {}; // Store ProductFile objects
   final List<String> _downloadQueue = [];
   bool _isDownloading = false;
   int _maxConcurrentDownloads = 3;
@@ -43,6 +44,9 @@ class DownloadProvider extends ChangeNotifier {
       // Already downloading or downloaded
       return;
     }
+
+    // Store the ProductFile for later use
+    _downloadFiles[file.id] = file;
 
     final progress = DownloadProgress(
       fileId: file.id,
@@ -85,14 +89,16 @@ class DownloadProvider extends ChangeNotifier {
 
   Future<void> _startDownload(String fileId) async {
     final progress = _downloads[fileId];
-    if (progress == null) return;
+    final file = _downloadFiles[fileId];
+    if (progress == null || file == null) return;
 
     try {
       _downloads[fileId] = progress.copyWith(status: DownloadStatus.downloading);
       notifyListeners();
 
+      // Use the actual download URL from the ProductFile
       await _downloadService.downloadFile(
-        fileId,
+        file.downloadUrl, // Pass the download URL instead of file ID
         progress.fileName,
         onProgress: (downloaded, total) {
           final updatedProgress = _downloads[fileId]?.copyWith(
@@ -147,7 +153,14 @@ class DownloadProvider extends ChangeNotifier {
 
   void cancelDownload(String fileId) {
     final progress = _downloads[fileId];
+    final file = _downloadFiles[fileId];
+    
     if (progress != null) {
+      // Cancel the actual download operation if it's in progress
+      if (file != null && progress.status == DownloadStatus.downloading) {
+        _downloadService.cancelDownload(file.downloadUrl);
+      }
+      
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.cancelled,
         endTime: DateTime.now(),

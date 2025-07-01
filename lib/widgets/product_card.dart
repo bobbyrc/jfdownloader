@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/download_provider.dart';
+import '../screens/product_details_screen.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -17,9 +18,11 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: InkWell(
+        onTap: () => _navigateToProductDetails(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Product image
           Expanded(
             flex: 3,
@@ -149,6 +152,15 @@ class ProductCard extends StatelessWidget {
             ),
           ),
         ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToProductDetails(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProductDetailsScreen(product: product),
       ),
     );
   }

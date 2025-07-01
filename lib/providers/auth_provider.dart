@@ -19,6 +19,11 @@ class AuthProvider extends ChangeNotifier {
     _clearError();
 
     try {
+      // For debugging - call debug method on first attempt
+      if (!_isLoggedIn) {
+        await _justFlightService.debugLoginPage();
+      }
+      
       final success = await _justFlightService.login(email, password);
       if (success) {
         _isLoggedIn = true;
@@ -26,7 +31,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _setError('Invalid credentials. Please check your email and password.');
+        _setError('Login failed. Please check your credentials and try again.\n\nIf this continues, the website structure may have changed.\nCheck the console for detailed debug information.');
         return false;
       }
     } catch (e) {

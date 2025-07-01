@@ -22,32 +22,48 @@ A cross-platform desktop application for downloading your purchased products fro
 
 ### Setup
 
+## Getting Started
+
 1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/jfdownloader.git
    cd jfdownloader
    ```
 
-2. Install dependencies:
+2. Set up the project (installs dependencies, builds models, and sets up environment):
    ```bash
-   flutter pub get
+   make setup
    ```
 
-3. Generate model files:
+3. Create a credentials file for testing (optional):
    ```bash
-   dart run build_runner build
+   echo "your-email@example.com" > credentials.txt
+   echo "your-password" >> credentials.txt
    ```
 
-4. Enable desktop support (if not already enabled):
+4. Run the application:
    ```bash
-   flutter config --enable-macos-desktop
-   flutter config --enable-windows-desktop
-   flutter config --enable-linux-desktop
+   make run
    ```
 
-5. Run the application:
-   ```bash
-   flutter run -d macos    # For macOS
+### Available Commands
+
+Run `make help` to see all available commands:
+
+- **Setup & Development:**
+  - `make setup` - Install dependencies and build
+  - `make run` - Run the app on macOS
+  - `make debug` - Run in debug mode
+  - `make clean` - Clean build artifacts
+  - `make analyze` - Run code analysis
+
+- **Testing & Analysis:**
+  - `make test-product-page` - Test product page structure analysis
+  - `make analyze-html` - Analyze captured HTML files
+
+- **Utilities:**
+  - `make restart-app` - Kill and restart Flutter app
+  - `make dev-setup` - Clean setup for development
    flutter run -d windows  # For Windows
    flutter run -d linux    # For Linux
    ```
