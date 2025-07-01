@@ -11,11 +11,24 @@ class ProductProvider extends ChangeNotifier {
   String _searchQuery = '';
   String _selectedCategory = 'All';
   
+  // Progress tracking for image fetching
+  bool _isFetchingImages = false;
+  int _totalProducts = 0;
+  int _completedProducts = 0;
+  String _currentProgressMessage = '';
+  
   List<Product> get products => _filteredProducts;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get searchQuery => _searchQuery;
   String get selectedCategory => _selectedCategory;
+  
+  // Progress getters
+  bool get isFetchingImages => _isFetchingImages;
+  double get imageProgress => _totalProducts > 0 ? _completedProducts / _totalProducts : 0.0;
+  String get progressMessage => _currentProgressMessage;
+  int get completedProducts => _completedProducts;
+  int get totalProducts => _totalProducts;
   
   List<String> get categories {
     final cats = _products.map((p) => p.category).toSet().toList();
@@ -42,12 +55,25 @@ class ProductProvider extends ChangeNotifier {
     return filtered;
   }
 
-  Future<void> loadProducts() async {
+  Future<void> loadProducts({bool fetchImages = true}) async {
     _setLoading(true);
     _clearError();
 
     try {
-      _products = await _justFlightService.getProducts();
+      _products = await _justFlightService.getProducts(
+        fetchImages: fetchImages,
+        onProgressUpdate: fetchImages ? (completed, total, message) {
+          if (completed == 0) {
+            // Products are loaded, now starting image fetching
+            _setLoading(false);
+            _startImageFetching(total);
+          } else if (completed < total) {
+            _updateImageProgress(completed, total, message);
+          } else {
+            _finishImageFetching();
+          }
+        } : null,
+      );
       notifyListeners();
     } catch (e) {
       _setError('Failed to load products: ${e.toString()}');
@@ -56,8 +82,8 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshProducts() async {
-    await loadProducts();
+  Future<void> refreshProducts({bool fetchImages = true}) async {
+    await loadProducts(fetchImages: fetchImages);
   }
 
   void setSearchQuery(String query) {
@@ -106,5 +132,26 @@ class ProductProvider extends ChangeNotifier {
   void clearError() {
     _clearError();
     notifyListeners();
+  }
+
+  // Progress tracking methods
+  void _setImageFetchingProgress(bool fetching, int total, int completed, String message) {
+    _isFetchingImages = fetching;
+    _totalProducts = total;
+    _completedProducts = completed;
+    _currentProgressMessage = message;
+    notifyListeners();
+  }
+
+  void _startImageFetching(int total) {
+    _setImageFetchingProgress(true, total, 0, 'Starting image fetching...');
+  }
+
+  void _updateImageProgress(int completed, int total, String message) {
+    _setImageFetchingProgress(true, total, completed, message);
+  }
+
+  void _finishImageFetching() {
+    _setImageFetchingProgress(false, _totalProducts, _totalProducts, 'Image fetching complete!');
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -55,6 +56,14 @@ class JustFlightService {
         'Cache-Control': 'max-age=0',
       },
     ));
+
+    // Configure connection pool for better concurrent performance
+    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = HttpClient();
+      client.maxConnectionsPerHost = 10; // Allow more concurrent connections
+      client.idleTimeout = const Duration(seconds: 30);
+      return client;
+    };
 
     // Add cookie manager with proper persistence
     _dio.interceptors.add(CookieManager(_cookieJar));
@@ -363,7 +372,10 @@ class JustFlightService {
     }
   }
 
-  Future<List<Product>> getProducts() async {
+  Future<List<Product>> getProducts({
+    bool fetchImages = false,
+    void Function(int completed, int total, String message)? onProgressUpdate,
+  }) async {
     await _initialize();
 
     try {
@@ -375,10 +387,82 @@ class JustFlightService {
       await _extractAndCachePostbackData(document);
       print('Cached orders page data and postback information for ${_cachedPostbackData.length} products');
       
-      return _parseProductsFromHtml(document);
+      List<Product> products = _parseProductsFromHtml(document);
+      
+      // Optionally fetch high-quality images from product pages
+      if (fetchImages) {
+        print('Fetching high-quality images for ${products.length} products concurrently...');
+        
+        // Report initial progress
+        onProgressUpdate?.call(0, products.length, 'Starting image fetching...');
+        
+        // Create futures for all image fetching operations
+        final imageFutures = products.asMap().entries.map((entry) {
+          final index = entry.key;
+          final product = entry.value;
+          
+          return _fetchProductImageWithRetry(product, index + 1, products.length);
+        }).toList();
+        
+        // Execute all requests concurrently with a reasonable limit
+        final batchSize = 10; // Increased concurrent requests for better performance
+        final enhancedProducts = <Product>[];
+        int completedCount = 0;
+        
+        for (int i = 0; i < imageFutures.length; i += batchSize) {
+          final batch = imageFutures.skip(i).take(batchSize);
+          final batchResults = await Future.wait(batch);
+          enhancedProducts.addAll(batchResults);
+          
+          completedCount += batchResults.length;
+          final batchNumber = (i ~/ batchSize) + 1;
+          final totalBatches = (imageFutures.length / batchSize).ceil();
+          
+          print('Completed batch $batchNumber/$totalBatches');
+          
+          // Report progress
+          onProgressUpdate?.call(
+            completedCount, 
+            products.length, 
+            'Completed batch $batchNumber/$totalBatches ($completedCount/${products.length} products)'
+          );
+          
+          // Small delay between batches
+          if (i + batchSize < imageFutures.length) {
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+        }
+        
+        products = enhancedProducts;
+        print('Concurrent image fetching complete!');
+        
+        // Report completion
+        onProgressUpdate?.call(products.length, products.length, 'Image fetching complete!');
+      }
+      
+      return products;
     } catch (e) {
       print('Get products error: $e');
       throw Exception('Failed to fetch products: $e');
+    }
+  }
+
+  /// Helper method to fetch product image with error handling and logging
+  Future<Product> _fetchProductImageWithRetry(Product product, int index, int total) async {
+    try {
+      print('Fetching image for product $index/$total: ${product.name}');
+      
+      final imageUrl = await fetchProductPageImage(product.name);
+      if (imageUrl != null) {
+        print('✓ Found image for ${product.name}');
+        return product.copyWith(imageUrl: imageUrl);
+      } else {
+        print('✗ No image found for ${product.name}');
+        return product;
+      }
+    } catch (e) {
+      print('✗ Error fetching image for ${product.name}: $e');
+      return product;
     }
   }
 
@@ -611,11 +695,6 @@ class JustFlightService {
                 // Special handling for productdownloads URLs - they need /account prefix
                 if (downloadUrl.startsWith('/productdownloads/')) {
                   fullDownloadUrl = '$baseUrl/account$downloadUrl';
-                } else if (downloadUrl.startsWith('productdownloads/')) {
-                  // Handle hrefs like "productdownloads/..." (no leading slash)
-                  fullDownloadUrl = '$baseUrl/account/$downloadUrl';
-                } else if (downloadUrl.startsWith('/')) {
-                  fullDownloadUrl = '$baseUrl$downloadUrl';
                 } else {
                   fullDownloadUrl = '$baseUrl/$downloadUrl';
                 }
@@ -1360,6 +1439,386 @@ class JustFlightService {
       'purchaseDate': purchaseDate,
       'version': version,
     };
+  }
+
+  /// Generate product URL based on product name and category
+  String _generateProductUrl(String productName) {
+    // Convert product name to URL slug
+    String slug = productName
+        .toLowerCase()
+        // Remove version numbers and simulator tags before processing
+        .replaceAll(RegExp(r'\s*\([^)]*\)'), '') // Remove anything in parentheses like (MSFS), (X-Plane 12), etc.
+        // Handle specific character replacements
+        .replaceAll('&', ' and ') // Replace ampersand with ' and '
+        .replaceAll('/', '-') // Replace forward slash with hyphen
+        .replaceAll(RegExp(r'[^\w\s-]'), '') // Remove remaining special characters except spaces and hyphens
+        .replaceAll(RegExp(r'\s+'), '-') // Replace spaces with hyphens
+        .replaceAll(RegExp(r'-+'), '-') // Replace multiple hyphens with single hyphen
+        .replaceAll(RegExp(r'^-|-$'), ''); // Remove leading/trailing hyphens
+
+    // Handle specific patterns that need special treatment
+    // Remove hyphens between specific letter-number combinations (e.g., pa-28r -> pa28r)
+    slug = slug.replaceAll('pa-28r', 'pa28r');
+    slug = slug.replaceAll('pa-28', 'pa28');
+
+    // Determine URL suffix based on product name
+    if (productName.contains('(MSFS)')) {
+      return 'https://www.justflight.com/product/$slug-microsoft-flight-simulator';
+    } else if (productName.contains('(X-Plane 12)')) {
+      return 'https://www.justflight.com/product/$slug-xplane-12';
+    } else if (productName.contains('(P3D)')) {
+      return 'https://www.justflight.com/product/$slug-p3d';
+    } else if (productName.contains('(FSX)')) {
+      return 'https://www.justflight.com/product/$slug-fsx';
+    } else {
+      return 'https://www.justflight.com/product/$slug';
+    }
+  }
+
+  /// Search for product and get the correct URL from search results
+  Future<String?> _searchForProductUrl(String productName) async {
+    try {
+      // Try multiple search strategies
+      final searchQueries = _generateSearchQueries(productName);
+      
+      for (int i = 0; i < searchQueries.length; i++) {
+        final query = searchQueries[i];
+        final encodedQuery = Uri.encodeComponent(query);
+        final searchUrl = 'https://www.justflight.com/searchresults?category=products&query=$encodedQuery';
+        
+        print('Search attempt ${i + 1}/${searchQueries.length}: $searchUrl');
+        
+        final response = await _dio.get(searchUrl);
+        if (response.statusCode == 200) {
+          final document = html_parser.parse(response.data);
+          
+          // Look for the search grid
+          final searchGrid = document.querySelector('ul.search-grid');
+          if (searchGrid != null) {
+            // Look for search items (div.searchedItem)
+            final searchItems = searchGrid.querySelectorAll('div.searchedItem');
+            print('Found ${searchItems.length} search results');
+            
+            if (searchItems.isNotEmpty) {
+              final result = _findBestMatch(searchItems, productName, query);
+              if (result != null) {
+                return result;
+              }
+            }
+          }
+        }
+        
+        // Small delay between search attempts (reduced for concurrent processing)
+        if (i < searchQueries.length - 1) {
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      }
+      
+      print('No product found after trying all search strategies');
+      return null;
+    } catch (e) {
+      print('Error searching for product: $e');
+      return null;
+    }
+  }
+
+  /// Generate multiple search queries for better matching
+  List<String> _generateSearchQueries(String productName) {
+    final queries = <String>[];
+    
+    // 1. Original product name
+    queries.add(productName);
+    
+    // 2. Remove parenthetical content like (MSFS), (FSX), etc.
+    final withoutParens = productName.replaceAll(RegExp(r'\s*\([^)]+\)\s*'), '').trim();
+    if (withoutParens != productName && withoutParens.isNotEmpty) {
+      queries.add(withoutParens);
+    }
+    
+    // 3. Remove special characters and normalize
+    final normalized = productName.replaceAll(RegExp(r'[^\w\s-]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized != productName && normalized.isNotEmpty) {
+      queries.add(normalized);
+    }
+    
+    // 4. For products with "Black Square", "Steam Gauge", etc., try searching without the prefix
+    if (productName.contains('Black Square')) {
+      final withoutPrefix = productName.replaceFirst('Black Square - ', '').trim();
+      if (withoutPrefix.isNotEmpty) {
+        queries.add(withoutPrefix);
+        // Also try with just "Black Square" + key terms
+        final keyTerms = withoutPrefix.split(' ').where((word) => word.length > 3).take(2).join(' ');
+        if (keyTerms.isNotEmpty) {
+          queries.add('Black Square $keyTerms');
+        }
+      }
+    }
+    
+    // 5. For Steam Gauge products, try different variations
+    if (productName.contains('Steam Gauge Overhaul')) {
+      final aircraft = productName.replaceFirst('Steam Gauge Overhaul - Analog ', '').trim();
+      if (aircraft.isNotEmpty) {
+        queries.add('Steam Gauge $aircraft');
+        queries.add(aircraft); // Just the aircraft name
+      }
+    }
+    
+    // 6. For long product names, try key terms only
+    final words = productName.split(' ').where((word) => word.length > 3 && !RegExp(r'[()&,-]').hasMatch(word)).toList();
+    if (words.length > 3) {
+      // Take first 3 meaningful words
+      queries.add(words.take(3).join(' '));
+      // Take first and last meaningful words
+      if (words.length >= 2) {
+        queries.add('${words.first} ${words.last}');
+      }
+    }
+    
+    // Remove duplicates while preserving order
+    final uniqueQueries = <String>[];
+    final seen = <String>{};
+    for (final query in queries) {
+      if (query.isNotEmpty && !seen.contains(query)) {
+        uniqueQueries.add(query);
+        seen.add(query);
+      }
+    }
+    
+    return uniqueQueries;
+  }
+
+  /// Find the best matching product from search results
+  String? _findBestMatch(List<dynamic> searchItems, String originalProductName, String searchQuery) {
+    String? bestMatch;
+    int bestScore = 0;
+    String? fallbackMatch;
+    
+    for (final item in searchItems) {
+      // Find the prod_title div within this search item
+      final prodTitleDiv = item.querySelector('div.prod_title');
+      if (prodTitleDiv != null) {
+        // Find the anchor tag with the product link (could be nested in strong tag)
+        final productLink = prodTitleDiv.querySelector('a[href]');
+        if (productLink != null) {
+          final href = productLink.attributes['href'];
+          final linkText = productLink.text.trim();
+          
+          print('Found product link: "$linkText" -> $href');
+          
+          if (href != null) {
+            // Store first result as fallback
+            if (fallbackMatch == null) {
+              fallbackMatch = _convertToAbsoluteUrl(href);
+            }
+            
+            // Calculate matching score
+            final score = _calculateMatchScore(originalProductName, linkText, searchQuery);
+            
+            print('Match score for "$linkText": $score');
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = _convertToAbsoluteUrl(href);
+              print('✓ New best match: "$linkText" (score: $score)');
+            } else {
+              print('✗ Lower score: "$linkText" (score: $score)');
+            }
+          }
+        }
+      }
+    }
+    
+    // Use best match if score is good enough, otherwise use fallback
+    if (bestScore >= 2) {
+      return bestMatch;
+    } else if (fallbackMatch != null) {
+      print('⚠️ Using fallback match (best score was $bestScore)');
+      return fallbackMatch;
+    }
+    
+    return null;
+  }
+
+  /// Calculate match score between product names
+  int _calculateMatchScore(String originalProduct, String linkText, String searchQuery) {
+    // Normalize both strings
+    final normalizedOriginal = originalProduct.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final normalizedLink = linkText.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final normalizedSearch = searchQuery.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    
+    // Split into words
+    final originalWords = normalizedOriginal.split(' ').where((w) => w.length > 2).toSet();
+    final linkWords = normalizedLink.split(' ').where((w) => w.length > 2).toSet();
+    final searchWords = normalizedSearch.split(' ').where((w) => w.length > 2).toSet();
+    
+    int score = 0;
+    
+    // Exact match gets highest score
+    if (normalizedOriginal == normalizedLink) {
+      score += 10;
+    }
+    
+    // High score for substring matches
+    if (normalizedLink.contains(normalizedOriginal) || normalizedOriginal.contains(normalizedLink)) {
+      score += 5;
+    }
+    
+    // Score for word matches with original product name
+    final originalMatches = originalWords.intersection(linkWords).length;
+    score += originalMatches * 2;
+    
+    // Score for word matches with search query
+    final searchMatches = searchWords.intersection(linkWords).length;
+    score += searchMatches;
+    
+    // Bonus for exact word matches in sequence
+    final originalWordsList = normalizedOriginal.split(' ');
+    final linkWordsList = normalizedLink.split(' ');
+    for (int i = 0; i < originalWordsList.length - 1; i++) {
+      final phrase = '${originalWordsList[i]} ${originalWordsList[i + 1]}';
+      if (normalizedLink.contains(phrase)) {
+        score += 3;
+      }
+    }
+    
+    return score;
+  }
+
+  /// Convert relative URL to absolute URL
+  String _convertToAbsoluteUrl(String href) {
+    if (href.startsWith('../')) {
+      return 'https://www.justflight.com/${href.substring(3)}';
+    } else if (href.startsWith('/')) {
+      return 'https://www.justflight.com$href';
+    } else if (href.startsWith('http')) {
+      return href;
+    } else {
+      return 'https://www.justflight.com/$href';
+    }
+  }
+  /// Fetch product page image URL
+  Future<String?> fetchProductPageImage(String productName) async {
+    try {
+      await _initialize();
+      
+      // First, search for the product to get the correct URL
+      final productUrl = await _searchForProductUrl(productName);
+      if (productUrl == null) {
+        print('Could not find product URL for: $productName');
+        return null;
+      }
+      
+      print('Found product URL: $productUrl');
+      print('Fetching product page for image extraction...');
+      
+      final response = await _dio.get(productUrl);
+      if (response.statusCode == 200) {
+        final document = html_parser.parse(response.data);
+        
+        // Look for the fancyPackShot image
+        final fancyPackShot = document.getElementById('fancyPackShot');
+        if (fancyPackShot != null) {
+          final href = fancyPackShot.attributes['href'];
+          if (href != null) {
+            // Handle both absolute and relative URLs
+            if (href.startsWith('//')) {
+              return 'https:$href';
+            } else if (href.startsWith('/')) {
+              return '$baseUrl$href';
+            } else if (href.startsWith('http')) {
+              return href;
+            } else {
+              return '$baseUrl/$href';
+            }
+          }
+        }
+        
+        // Fallback: look for other product images if fancyPackShot is not found
+        final productImages = document.querySelectorAll('img.artwork, .prodImageFloatRight img, img[alt*="aircraft"], img[alt*="plane"]');
+        for (final img in productImages) {
+          final src = img.attributes['src'];
+          if (src != null && src.contains('productimages')) {
+            if (src.startsWith('//')) {
+              return 'https:$src';
+            } else if (src.startsWith('/')) {
+              return '$baseUrl$src';
+            } else if (src.startsWith('http')) {
+              return src;
+            }
+          }
+        }
+        
+        print('No suitable product image found on page');
+        return null;
+      } else {
+        print('Failed to fetch product page: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching product page image: $e');
+      return null;
+    }
+  }
+
+  /// Fetch additional product information from product page
+  Future<Map<String, dynamic>?> fetchProductPageInfo(String productName) async {
+    try {
+      await _initialize();
+      
+      String productUrl = _generateProductUrl(productName);
+      print('Fetching product info from: $productUrl');
+      
+      Response response;
+      try {
+        response = await _dio.get(productUrl);
+      } catch (e) {
+        // If it's an MSFS product and the standard URL fails, try the -msfs suffix
+        if (productName.contains('(MSFS)') && productUrl.contains('-microsoft-flight-simulator')) {
+          final fallbackUrl = productUrl.replaceAll('-microsoft-flight-simulator', '-msfs');
+          print('Primary URL failed, trying fallback: $fallbackUrl');
+          response = await _dio.get(fallbackUrl);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (response.statusCode == 200) {
+        final document = html_parser.parse(response.data);
+        
+        final info = <String, dynamic>{};
+        
+        // Extract product description
+        final descDiv = document.getElementById('prodDescriptionDiv');
+        if (descDiv != null) {
+          info['description'] = descDiv.text.trim();
+        }
+        
+        // Extract product image
+        final imageUrl = await fetchProductPageImage(productName);
+        if (imageUrl != null) {
+          info['imageUrl'] = imageUrl;
+        }
+        
+        // Extract requirements
+        final reqBox = document.getElementById('requirementsBox');
+        if (reqBox != null) {
+          final requirements = <String>[];
+          final listItems = reqBox.querySelectorAll('li');
+          for (final item in listItems) {
+            requirements.add(item.text.trim());
+          }
+          info['requirements'] = requirements;
+        }
+        
+        return info;
+      } else {
+        print('Failed to fetch product page info: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching product page info: $e');
+      return null;
+    }
   }
 
   /// Debug method to help troubleshoot login issues

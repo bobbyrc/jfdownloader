@@ -16,13 +16,14 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   bool _showDownloadPanel = false;
+  bool _fetchImages = true; // Default to true for better user experience
 
   @override
   void initState() {
     super.initState();
     // Load products when the screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductProvider>(context, listen: false).loadProducts();
+      Provider.of<ProductProvider>(context, listen: false).loadProducts(fetchImages: _fetchImages);
     });
   }
 
@@ -62,7 +63,7 @@ class _MainScreenState extends State<MainScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh),
-                onPressed: productProvider.isLoading ? null : () => productProvider.refreshProducts(),
+                onPressed: productProvider.isLoading ? null : () => productProvider.refreshProducts(fetchImages: _fetchImages),
                 tooltip: 'Refresh',
               );
             },
@@ -155,6 +156,88 @@ class _MainScreenState extends State<MainScreen> {
                               CircularProgressIndicator(),
                               SizedBox(height: 16),
                               Text('Loading your products...'),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Show progress bar for image fetching
+                      if (productProvider.isFetchingImages) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Products are loaded, show them with progress overlay
+                              if (productProvider.products.isNotEmpty) ...[
+                                Expanded(
+                                  child: const ProductGrid(),
+                                ),
+                                // Progress overlay at the bottom
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.surface,
+                                    border: Border(
+                                      top: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                      ),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.image, size: 20),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              productProvider.progressMessage,
+                                              style: Theme.of(context).textTheme.bodyMedium,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${productProvider.completedProducts}/${productProvider.totalProducts}',
+                                            style: Theme.of(context).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      LinearProgressIndicator(
+                                        value: productProvider.imageProgress,
+                                        backgroundColor: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                // No products yet, just show progress
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 16),
+                                Text(
+                                  productProvider.progressMessage,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: 300,
+                                  child: LinearProgressIndicator(
+                                    value: productProvider.imageProgress,
+                                    backgroundColor: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${productProvider.completedProducts}/${productProvider.totalProducts} products',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -288,6 +371,22 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   ),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Fetch High-Quality Images'),
+                  subtitle: const Text('Download product images from JustFlight website\n(slower but better looking)'),
+                  value: _fetchImages,
+                  onChanged: (value) {
+                    setState(() {
+                      _fetchImages = value;
+                    });
+                    Navigator.of(context).pop();
+                    // Optionally refresh products if toggling to enable images
+                    if (value) {
+                      Provider.of<ProductProvider>(context, listen: false).refreshProducts(fetchImages: true);
+                    }
+                  },
                 ),
               ],
             );
