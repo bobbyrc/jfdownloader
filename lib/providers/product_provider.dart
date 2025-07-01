@@ -60,20 +60,24 @@ class ProductProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      _products = await _justFlightService.getProducts(
-        fetchImages: fetchImages,
-        onProgressUpdate: fetchImages ? (completed, total, message) {
-          if (completed == 0) {
-            // Products are loaded, now starting image fetching
-            _setLoading(false);
-            _startImageFetching(total);
-          } else if (completed < total) {
-            _updateImageProgress(completed, total, message);
-          } else {
-            _finishImageFetching();
-          }
-        } : null,
-      );
+      if (fetchImages) {
+        // Set up progress callback for image fetching
+        _products = await _justFlightService.getProducts(
+          fetchImages: fetchImages,
+          onProgressUpdate: (completed, total, message) {
+            print('🔄 Progress update: $completed/$total - $message');
+            if (completed == 0) {
+              _startImageFetching(total);
+            } else if (completed < total) {
+              _updateImageProgress(completed, total, message);
+            } else {
+              _finishImageFetching();
+            }
+          },
+        );
+      } else {
+        _products = await _justFlightService.getProducts(fetchImages: fetchImages);
+      }
       notifyListeners();
     } catch (e) {
       _setError('Failed to load products: ${e.toString()}');
@@ -144,14 +148,17 @@ class ProductProvider extends ChangeNotifier {
   }
 
   void _startImageFetching(int total) {
+    print('📊 Starting image fetching: $total products');
     _setImageFetchingProgress(true, total, 0, 'Starting image fetching...');
   }
 
   void _updateImageProgress(int completed, int total, String message) {
+    print('📈 Updating progress: $completed/$total - $message');
     _setImageFetchingProgress(true, total, completed, message);
   }
 
   void _finishImageFetching() {
+    print('✅ Finishing image fetching');
     _setImageFetchingProgress(false, _totalProducts, _totalProducts, 'Image fetching complete!');
   }
 }
