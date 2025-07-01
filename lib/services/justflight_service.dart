@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:cookie_jar/cookie_jar.dart';
@@ -57,10 +58,10 @@ class JustFlightService {
       },
     ));
 
-    // Configure connection pool for better concurrent performance
+    // Configure connection pool for reasonable concurrent performance
     (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
       final client = HttpClient();
-      client.maxConnectionsPerHost = 10; // Allow more concurrent connections
+      client.maxConnectionsPerHost = 3; // Reduce concurrent connections to avoid server overload
       client.idleTimeout = const Duration(seconds: 30);
       return client;
     };
@@ -68,14 +69,14 @@ class JustFlightService {
     // Add cookie manager with proper persistence
     _dio.interceptors.add(CookieManager(_cookieJar));
 
-    // Add logging interceptor for debugging
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: false,
-      responseBody: false,
-      requestHeader: false,
-      responseHeader: false,
-      logPrint: (obj) => print('HTTP: $obj'),
-    ));
+    // Add logging interceptor for debugging (disabled to reduce log noise)
+    // _dio.interceptors.add(LogInterceptor(
+    //   requestBody: false,
+    //   responseBody: false,
+    //   requestHeader: false,
+    //   responseHeader: false,
+    //   logPrint: (obj) => print('HTTP: $obj'),
+    // ));
 
     _initialized = true;
   }
@@ -396,45 +397,62 @@ class JustFlightService {
         // Report initial progress
         onProgressUpdate?.call(0, products.length, 'Starting image fetching...');
         
-        // Create futures for all image fetching operations
-        final imageFutures = products.asMap().entries.map((entry) {
-          final index = entry.key;
-          final product = entry.value;
-          
-          return _fetchProductImageWithRetry(product, index + 1, products.length);
-        }).toList();
-        
-        // Execute all requests concurrently with a reasonable limit
-        final batchSize = 10; // Increased concurrent requests for better performance
+        // Use Stream-based approach (like Go channels) for real-time progress
         final enhancedProducts = <Product>[];
-        int completedCount = 0;
+        final maxConcurrent = 3;
         
-        for (int i = 0; i < imageFutures.length; i += batchSize) {
-          final batch = imageFutures.skip(i).take(batchSize);
-          final batchResults = await Future.wait(batch);
-          enhancedProducts.addAll(batchResults);
+        // Create a stream controller to act like a Go channel
+        final resultController = StreamController<Product>();
+        
+        // Listen to the stream for real-time progress updates
+        final streamSubscription = resultController.stream.listen((product) {
+          enhancedProducts.add(product);
           
-          completedCount += batchResults.length;
-          final batchNumber = (i ~/ batchSize) + 1;
-          final totalBatches = (imageFutures.length / batchSize).ceil();
-          
-          print('Completed batch $batchNumber/$totalBatches');
-          
-          // Report progress
+          // Report progress immediately when each product completes
           onProgressUpdate?.call(
-            completedCount, 
+            enhancedProducts.length, 
             products.length, 
-            'Completed batch $batchNumber/$totalBatches ($completedCount/${products.length} products)'
+            'Processed ${enhancedProducts.length}/${products.length} products'
           );
+        });
+        
+        // Simple concurrency control using a counter
+        int activeWorkers = 0;
+        int completedWorkers = 0;
+        
+        for (int i = 0; i < products.length; i++) {
+          final product = products[i];
+          final productIndex = i;
           
-          // Small delay between batches
-          if (i + batchSize < imageFutures.length) {
-            await Future.delayed(const Duration(milliseconds: 200));
+          // Wait if we've hit our concurrency limit
+          while (activeWorkers >= maxConcurrent) {
+            await Future.delayed(const Duration(milliseconds: 10));
           }
+          
+          // Launch worker and increment counter
+          activeWorkers++;
+          _fetchProductImageWorker(
+            product, 
+            productIndex + 1, 
+            products.length, 
+            resultController
+          ).then((_) {
+            activeWorkers--;
+            completedWorkers++;
+          });
         }
         
+        // Wait for all workers to complete
+        while (completedWorkers < products.length) {
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
+        
+        // Close the channel and clean up
+        await resultController.close();
+        await streamSubscription.cancel();
+        
         products = enhancedProducts;
-        print('Concurrent image fetching complete!');
+        print('Image fetching complete!');
         
         // Report completion
         onProgressUpdate?.call(products.length, products.length, 'Image fetching complete!');
@@ -444,6 +462,33 @@ class JustFlightService {
     } catch (e) {
       print('Get products error: $e');
       throw Exception('Failed to fetch products: $e');
+    }
+  }
+
+  /// Worker function that sends results to stream (like Go channel)
+  Future<void> _fetchProductImageWorker(
+    Product product, 
+    int index, 
+    int total, 
+    StreamController<Product> resultChannel
+  ) async {
+    try {
+      print('Fetching image for product $index/$total: ${product.name}');
+      
+      final imageUrl = await fetchProductPageImage(product.name);
+      if (imageUrl != null) {
+        print('✓ Found image for ${product.name}');
+        // Send enhanced product to channel
+        resultChannel.add(product.copyWith(imageUrl: imageUrl));
+      } else {
+        print('✗ No image found for ${product.name}');
+        // Send original product to channel
+        resultChannel.add(product);
+      }
+    } catch (e) {
+      print('✗ Error fetching image for ${product.name}: $e');
+      // Send original product to channel on error
+      resultChannel.add(product);
     }
   }
 
@@ -1488,7 +1533,13 @@ class JustFlightService {
         
         print('Search attempt ${i + 1}/${searchQueries.length}: $searchUrl');
         
-        final response = await _dio.get(searchUrl);
+        final response = await _dio.get(
+          searchUrl,
+          options: Options(
+            receiveTimeout: const Duration(seconds: 10), // Shorter timeout for search
+            sendTimeout: const Duration(seconds: 5),
+          ),
+        );
         if (response.statusCode == 200) {
           final document = html_parser.parse(response.data);
           
@@ -1508,16 +1559,22 @@ class JustFlightService {
           }
         }
         
-        // Small delay between search attempts (reduced for concurrent processing)
-        if (i < searchQueries.length - 1) {
-          await Future.delayed(Duration(milliseconds: 100));
-        }
+        // Try next search query without delay (server-friendly)
       }
       
       print('No product found after trying all search strategies');
       return null;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionTimeout) {
+        print('Timeout searching for product $productName: ${e.message}');
+      } else if (e.response?.statusCode == 500) {
+        print('Server error (500) searching for product $productName - server may be overloaded');
+      } else {
+        print('Network error searching for product $productName: ${e.message}');
+      }
+      return null;
     } catch (e) {
-      print('Error searching for product: $e');
+      print('Error searching for product $productName: $e');
       return null;
     }
   }
@@ -1711,7 +1768,15 @@ class JustFlightService {
       print('Found product URL: $productUrl');
       print('Fetching product page for image extraction...');
       
-      final response = await _dio.get(productUrl);
+      // Use shorter timeout for image fetching to avoid holding up the queue
+      final response = await _dio.get(
+        productUrl,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15), // Shorter timeout for images
+          sendTimeout: const Duration(seconds: 10),
+        ),
+      );
+      
       if (response.statusCode == 200) {
         final document = html_parser.parse(response.data);
         
@@ -1754,8 +1819,17 @@ class JustFlightService {
         print('Failed to fetch product page: ${response.statusCode}');
         return null;
       }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionTimeout) {
+        print('Timeout fetching product page image for $productName: ${e.message}');
+      } else if (e.response?.statusCode == 500) {
+        print('Server error (500) fetching product page for $productName - server may be overloaded');
+      } else {
+        print('Network error fetching product page image for $productName: ${e.message}');
+      }
+      return null;
     } catch (e) {
-      print('Error fetching product page image: $e');
+      print('Error fetching product page image for $productName: $e');
       return null;
     }
   }
@@ -1864,7 +1938,7 @@ class JustFlightService {
       print('Email/Username fields found: ${emailInputs.length}');
       for (final input in emailInputs) {
         print('  - ${input.attributes['name']}: ${input.attributes['type']}');
-      }
+           }
       
       print('Password fields found: ${passwordInputs.length}');
       for (final input in passwordInputs) {

@@ -67,6 +67,8 @@ class ProductProvider extends ChangeNotifier {
           onProgressUpdate: (completed, total, message) {
             print('🔄 Progress update: $completed/$total - $message');
             if (completed == 0) {
+              // Products are loaded, now starting image fetching
+              _setLoading(false); // Turn off main loading, enable image progress
               _startImageFetching(total);
             } else if (completed < total) {
               _updateImageProgress(completed, total, message);
@@ -82,7 +84,10 @@ class ProductProvider extends ChangeNotifier {
     } catch (e) {
       _setError('Failed to load products: ${e.toString()}');
     } finally {
-      _setLoading(false);
+      // Only set loading to false if we're not fetching images
+      if (!_isFetchingImages) {
+        _setLoading(false);
+      }
     }
   }
 
