@@ -415,7 +415,7 @@ class JustFlightService {
           onProgressUpdate?.call(
             enhancedProducts.length, 
             products.length, 
-            'Processed ${enhancedProducts.length}/${products.length} products'
+            'Processing products...'
           );
         });
         
@@ -629,7 +629,7 @@ class JustFlightService {
     return Product(
       id: productId,
       name: titleText,
-      description: 'Order: $orderNumber${status.isNotEmpty ? ', Status: $status' : ''}',
+      description: 'Order: $orderNumber',
       imageUrl: '', // No image available in orders table
       category: _extractCategory(titleText, ''),
       files: files,
