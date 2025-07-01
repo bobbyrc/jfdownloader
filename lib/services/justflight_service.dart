@@ -485,6 +485,12 @@ class JustFlightService {
       if (imageUrl != null || category != null) {
         _logger.debug('✓ Found ${imageUrl != null ? 'image' : ''}${imageUrl != null && category != null ? ' and ' : ''}${category != null ? 'category ($category)' : ''} for ${product.name}');
         
+        // Update cached category if we found a better one
+        if (category != null && category != 'Unknown' && category.isNotEmpty) {
+          _cachedCategories[product.id] = category;
+          _logger.debug('Updated cached category for ${product.id}: $category');
+        }
+        
         // Update product with new information
         var updatedProduct = product;
         if (imageUrl != null) {
@@ -563,13 +569,22 @@ class JustFlightService {
     // Column 1: Status
     // Column 2: Product Title (with download link)
     // Column 3: Order Number
-    // Column 4: Date Ordered
+    // Column 4: Date Ordered (PURCHASE DATE)
     // Column 5: Last Downloaded
     
     final cells = row.querySelectorAll('th, td');
+    _logger.debug('Row $index: Found ${cells.length} cells');
+    
     if (cells.length < 4) {
       _logger.debug('Row $index has insufficient columns: ${cells.length}');
       return null;
+    }
+    
+    // Log all cell contents for debugging
+    for (int i = 0; i < cells.length; i++) {
+      final cellText = cells[i].text.trim();
+      final dataSortAttr = cells[i].attributes['data-sort'];
+      _logger.debug('Row $index, Cell $i: "$cellText" (data-sort: "$dataSortAttr")');
     }
     
     // Extract product title from column 2
@@ -591,9 +606,63 @@ class JustFlightService {
     final statusCell = cells.length > 1 ? cells[1] : null;
     final status = statusCell?.text.trim() ?? '';
     
-    // Extract date from column 4 if available
+    // Extract purchase date from column 4 (Date Ordered) if available
     final dateCell = cells.length > 4 ? cells[4] : null;
-    final dateText = dateCell?.text.trim() ?? '';
+    DateTime? purchaseDate;
+    
+    _logger.debug('Row $index: Extracting purchase date from column 4 (Date Ordered)');
+    if (dateCell != null) {
+      _logger.debug('Row $index: Found date cell, checking data-sort attribute...');
+      
+      // Try to get the date from the data-sort attribute first (YYYY/MM/DD HH:MM:SS format)
+      final dataSortAttr = dateCell.attributes['data-sort'];
+      _logger.debug('Row $index: data-sort attribute: "$dataSortAttr"');
+      
+      if (dataSortAttr != null && dataSortAttr.trim().isNotEmpty && dataSortAttr != '0000/00/00') {
+        try {
+          // Parse the ISO-style date from data-sort attribute
+          final dateParts = dataSortAttr.split(' ');
+          if (dateParts.isNotEmpty) {
+            final dateOnly = dateParts[0]; // Get just the date part (YYYY/MM/DD)
+            final parts = dateOnly.split('/');
+            if (parts.length == 3) {
+              final year = int.parse(parts[0]);
+              final month = int.parse(parts[1]);
+              final day = int.parse(parts[2]);
+              purchaseDate = DateTime(year, month, day);
+              _logger.debug('Row $index: Parsed purchase date from data-sort: $purchaseDate');
+            }
+          }
+        } catch (e) {
+          _logger.warning('Row $index: Could not parse date from data-sort "$dataSortAttr": $e');
+        }
+      }
+      
+      // If data-sort parsing failed, try to parse the display date (DD/MM/YYYY format)
+      if (purchaseDate == null) {
+        final displayDateSpan = dateCell.querySelector('span span');
+        final displayDate = displayDateSpan?.text.trim() ?? dateCell.text.trim();
+        _logger.debug('Row $index: Trying display date: "$displayDate"');
+        
+        if (displayDate.isNotEmpty && displayDate != '-') {
+          try {
+            // Parse UK date format DD/MM/YYYY
+            final parts = displayDate.split('/');
+            if (parts.length == 3) {
+              final day = int.parse(parts[0]);
+              final month = int.parse(parts[1]);
+              final year = int.parse(parts[2]);
+              purchaseDate = DateTime(year, month, day);
+              _logger.debug('Row $index: Parsed purchase date from display text: $purchaseDate');
+            }
+          } catch (e) {
+            _logger.warning('Row $index: Could not parse display date "$displayDate": $e');
+          }
+        }
+      }
+    } else {
+      _logger.debug('Row $index: No date cell found (insufficient columns: ${cells.length})');
+    }
     
     // Create product ID from order number or title
     final productId = orderNumber.isNotEmpty ? orderNumber : _generateProductId(titleText);
@@ -628,28 +697,35 @@ class JustFlightService {
       ));
     }
     
-    // Parse date if available
-    DateTime? purchaseDate;
-    if (dateText.isNotEmpty) {
-      try {
-        // Try to parse the date - adjust format as needed
-        purchaseDate = DateTime.tryParse(dateText);
-      } catch (e) {
-        _logger.warning('Could not parse date: $dateText');
-      }
-    }
+    final productCategory = _extractCategory(titleText, '');
     
-    return Product(
+    final product = Product(
       id: productId,
       name: titleText,
       description: 'Order: $orderNumber',
       imageUrl: '', // No image available in orders table
-      category: _extractCategory(titleText, ''),
+      category: productCategory,
       files: files,
       purchaseDate: purchaseDate ?? DateTime.now(),
       version: '1.0',
       sizeInMB: 0.0,
     );
+    
+    // Cache the purchase date for use in detailed product fetching
+    if (purchaseDate != null) {
+      _cachedPurchaseDates[productId] = purchaseDate;
+      _logger.debug('Cached purchase date for $productId: $purchaseDate');
+    } else {
+      _logger.debug('No purchase date to cache for $productId');
+    }
+    
+    // Cache the category for use in detailed product fetching
+    if (productCategory.isNotEmpty) {
+      _cachedCategories[productId] = productCategory;
+      _logger.debug('Cached category for $productId: $productCategory');
+    }
+    
+    return product;
   }
 
   Product? _parseProductElement(dom.Element element) {
@@ -951,10 +1027,15 @@ class JustFlightService {
   // Cache for orders page data to avoid re-fetching
   String? _cachedOrdersHtml;
   Map<String, Map<String, String>> _cachedPostbackData = {};
+  Map<String, DateTime> _cachedPurchaseDates = {};
+  Map<String, String> _cachedCategories = {};
 
   Future<Map<String, dynamic>> getProductDetails(String productId) async {
     _logger.debug('=== getProductDetails called ===');
     _logger.debug('Product ID: $productId');
+    _logger.debug('Cached purchase dates available: ${_cachedPurchaseDates.keys.toList()}');
+    _logger.debug('Cached categories available: ${_cachedCategories.keys.toList()}');
+    _logger.debug('Looking for purchase date for: $productId');
     
     try {
       _logger.debug('=== Fetching Product Details ===');
@@ -1040,6 +1121,8 @@ class JustFlightService {
     
     // Clear existing cache
     _cachedPostbackData.clear();
+    _cachedPurchaseDates.clear();
+    _cachedCategories.clear();
     
     // Process each row to find product links
     for (int i = 1; i < tableRows.length; i++) { // Skip header row
@@ -1173,13 +1256,21 @@ class JustFlightService {
     _logger.debug('Successfully loaded product-specific details page');
 
     // Extract detailed product information
-    final result = _parseProductDetailsPage(detailsDoc, orderNumber); // Pass the correct order number
+    // Get the cached purchase date for this product
+    final cachedPurchaseDate = _cachedPurchaseDates[orderNumber];
+    _logger.debug('Looking up cached purchase date for orderNumber: $orderNumber');
+    _logger.debug('Found cached purchase date: $cachedPurchaseDate');
+    // Get the cached category for this product
+    final cachedCategory = _cachedCategories[orderNumber];
+    _logger.debug('Looking up cached category for orderNumber: $orderNumber');
+    _logger.debug('Found cached category: $cachedCategory');
+    final result = _parseProductDetailsPage(detailsDoc, orderNumber, cachedPurchaseDate, cachedCategory); // Pass the correct order number, purchase date, and category
     
     _logger.debug('Parsed product details: ${result.keys.toList()}');
     return result;
   }
 
-  Map<String, dynamic> _parseProductDetailsPage(dom.Document document, String orderNumber) {
+  Map<String, dynamic> _parseProductDetailsPage(dom.Document document, String orderNumber, DateTime? cachedPurchaseDate, String? cachedCategory) {
     _logger.debug('=== Parsing Product Details Page ===');
 
     // Look for the product information
@@ -1201,106 +1292,30 @@ class JustFlightService {
     // Use the passed order number directly (it's already the correct JFL order number)
     _logger.debug('Using order number: $orderNumber');
 
-    // Extract purchase date from the page (look for more recent dates)
-    DateTime? purchaseDate;
-    String? version;
-    
-    // Look for date patterns in the content - prioritize more recent dates
-    final pageText = document.body?.text ?? '';
-    _logger.debug('Searching for dates in page content (${pageText.length} chars)...');
-    
-    final dateMatches = RegExp(r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})').allMatches(pageText);
-    
-    _logger.debug('Found ${dateMatches.length} date matches in page content');
-    List<DateTime> validDates = [];
-    
-    for (final match in dateMatches) {
-      try {
-        final dateStr = match.group(1)!;
-        _logger.debug('Checking date: $dateStr');
-        final parts = dateStr.split(RegExp(r'[\/\-]'));
-        if (parts.length == 3) {
-          // Determine the date format by checking the values
-          // Most likely formats: DD-MM-YY, MM-DD-YY, YY-MM-DD
-          
-          int part1 = int.parse(parts[0]);
-          int part2 = int.parse(parts[1]);
-          int part3 = int.parse(parts[2]);
-          
-          int day, month, year;
-          
-          // If any part is > 31, it's likely the year
-          // If any part is > 12 and <= 31, it's likely the day
-          if (part1 > 31) {
-            // Format: YYYY-MM-DD
-            year = part1;
-            month = part2;
-            day = part3;
-          } else if (part3 > 31) {
-            // Format: MM-DD-YYYY or DD-MM-YYYY
-            year = part3;
-            if (part1 > 12) {
-              // DD-MM-YYYY
-              day = part1;
-              month = part2;
-            } else if (part2 > 12) {
-              // MM-DD-YYYY
-              month = part1;
-              day = part2;
-            } else {
-              // Ambiguous, assume DD-MM-YYYY for UK format
-              day = part1;
-              month = part2;
-            }
-          } else {
-            // All parts <= 31, likely 2-digit year
-            // Based on your feedback, 25-06-21 should be 21/06/2025
-            // This suggests format: YY-MM-DD
-            year = part1;
-            month = part2;
-            day = part3;
-            
-            // Handle 2-digit years
-            if (year < 100) {
-              if (year > 50) {
-                year += 1900; // 51-99 -> 1951-1999
-              } else {
-                year += 2000; // 00-50 -> 2000-2050
-              }
-            }
-          }
-          
-          final parsedDate = DateTime(year, month, day);
-          
-          // Only accept dates from 2010 onwards (reasonable for software purchases)
-          if (parsedDate.year >= 2010 && parsedDate.year <= DateTime.now().year + 10) {
-            validDates.add(parsedDate);
-            _logger.debug('Valid date found: $parsedDate');
-          } else {
-            _logger.debug('Date out of range: $parsedDate');
-          }
-        }
-      } catch (e) {
-        // Skip invalid dates
-        _logger.warning('Could not parse date: ${match.group(1)} - $e');
-        continue;
-      }
-    }
-    
-    // Use the most recent valid date
-    if (validDates.isNotEmpty) {
-      validDates.sort((a, b) => b.compareTo(a)); // Sort descending (most recent first)
-      purchaseDate = validDates.first;
-      _logger.debug('Selected most recent purchase date: $purchaseDate');
+    // Use the cached purchase date from the orders table (authoritative source)
+    final purchaseDate = cachedPurchaseDate;
+    if (purchaseDate != null) {
+      _logger.debug('Using cached purchase date: $purchaseDate');
     } else {
-      _logger.debug('No valid purchase dates found');
+      _logger.warning('No cached purchase date found for product $orderNumber');
     }
+    
+    // Use the cached category from the orders table (authoritative source)
+    if (cachedCategory != null) {
+      _logger.debug('Using cached category: $cachedCategory');
+    } else {
+      _logger.warning('No cached category found for product $orderNumber, will use fallback');
+    }
+    
+    String? version;
     
     // Look for version information
     _logger.debug('Looking for version information in page content...');
     
     // Try multiple version patterns, including versions from file names
     List<String> versionCandidates = [];
+    
+    final pageText = document.body?.text ?? '';
     
     // Pattern 1: Version: X.X.X
     final versionMatch1 = RegExp(r'[vV]ersion\s*:?\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)').firstMatch(pageText);
@@ -1564,7 +1579,7 @@ class JustFlightService {
         name: productName,
         description: description.isNotEmpty ? description : 'Flight simulation software',
         imageUrl: '', // Would need to be extracted if present
-        category: 'Software',
+        category: cachedCategory ?? 'Software', // Use cached category or fallback to 'Software'
         files: downloadableFiles,
         purchaseDate: purchaseDate ?? DateTime.now(),
         version: version ?? '1.0',
