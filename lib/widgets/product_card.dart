@@ -96,30 +96,6 @@ class ProductCard extends StatelessWidget {
                   
                   const SizedBox(height: 12),
                   
-                  // File count and size
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.folder_zip,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${product.files.length} files',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const Spacer(),
-                      if (product.sizeInMB > 0)
-                        Text(
-                          '${product.sizeInMB.toStringAsFixed(1)} MB',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
                   // Download status and button
                   Consumer<DownloadProvider>(
                     builder: (context, downloadProvider, child) {
