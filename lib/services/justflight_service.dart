@@ -1577,7 +1577,7 @@ class JustFlightService {
       detailedProduct = Product(
         id: orderNumber,
         name: productName,
-        description: description.isNotEmpty ? description : 'Flight simulation software',
+        description: description.isNotEmpty ? description : '',
         imageUrl: '', // Would need to be extracted if present
         category: cachedCategory ?? 'Software', // Use cached category or fallback to 'Software'
         files: downloadableFiles,
