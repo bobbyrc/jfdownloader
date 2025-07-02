@@ -491,6 +491,12 @@ class JustFlightService {
           _logger.debug('Updated cached category for ${product.id}: $category');
         }
         
+        // Cache the image URL for later use in details page
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          _cachedImageUrls[product.id] = imageUrl;
+          _logger.debug('🖼️ Cached image URL for ${product.id}: $imageUrl');
+        }
+        
         // Update product with new information
         var updatedProduct = product;
         if (imageUrl != null) {
@@ -1029,6 +1035,7 @@ class JustFlightService {
   Map<String, Map<String, String>> _cachedPostbackData = {};
   Map<String, DateTime> _cachedPurchaseDates = {};
   Map<String, String> _cachedCategories = {};
+  Map<String, String> _cachedImageUrls = {};
 
   Future<Map<String, dynamic>> getProductDetails(String productId) async {
     _logger.debug('=== getProductDetails called ===');
@@ -1264,13 +1271,13 @@ class JustFlightService {
     final cachedCategory = _cachedCategories[orderNumber];
     _logger.debug('Looking up cached category for orderNumber: $orderNumber');
     _logger.debug('Found cached category: $cachedCategory');
-    final result = _parseProductDetailsPage(detailsDoc, orderNumber, cachedPurchaseDate, cachedCategory); // Pass the correct order number, purchase date, and category
+    final result = _parseProductDetailsPage(detailsDoc, orderNumber, cachedPurchaseDate, cachedCategory, productName, orderNumber); // Pass the correct order number, purchase date, category, original product name, and product ID
     
     _logger.debug('Parsed product details: ${result.keys.toList()}');
     return result;
   }
 
-  Map<String, dynamic> _parseProductDetailsPage(dom.Document document, String orderNumber, DateTime? cachedPurchaseDate, String? cachedCategory) {
+  Map<String, dynamic> _parseProductDetailsPage(dom.Document document, String orderNumber, DateTime? cachedPurchaseDate, String? cachedCategory, String originalProductName, String productId) {
     _logger.debug('=== Parsing Product Details Page ===');
 
     // Look for the product information
@@ -1278,16 +1285,89 @@ class JustFlightService {
     final downloadableFiles = <ProductFile>[];
     final installationInfo = <String, String>{};
 
-    // Extract product name and description from the page
-    final titleElement = document.querySelector('h1, h2, .product-title, #productTitle') ?? 
-                        document.querySelector('title');
-    var productName = titleElement?.text.trim() ?? 'Product Details';
+    // Use the original product name from the orders table (more reliable than HTML title)
+    var productName = originalProductName;
+    _logger.debug('Using original product name: $productName');
     
-    // Clean up the product name (remove "Just Flight" prefix etc.)
-    productName = productName.replaceAll(RegExp(r'^Just Flight\s*-?\s*'), '').trim();
-    
+    // Extract description from the page
     final descriptionElement = document.querySelector('.description, .product-description, .content, #productDescription');
     final description = descriptionElement?.text.trim() ?? '';
+
+    // Extract image URL from the product details page
+    String? imageUrl;
+    _logger.debug('Looking for product image in details page...');
+    
+    // Try the specific selector for the image with id="img0" and class="artwork"
+    final imageSelectors = [
+      '#img0.artwork',     // Most specific: id AND class
+      '#img0',             // Just the ID
+      'img.artwork',       // Just the class
+      'img[id="img0"]',    // Alternative ID selector
+    ];
+    
+    for (final selector in imageSelectors) {
+      final imageElement = document.querySelector(selector);
+      if (imageElement != null) {
+        final src = imageElement.attributes['src'];
+        final id = imageElement.attributes['id'];
+        final className = imageElement.attributes['class'];
+        _logger.debug('Found image element with selector "$selector"');
+        _logger.debug('  - id: "$id"');
+        _logger.debug('  - class: "$className"'); 
+        _logger.debug('  - src: "$src"');
+        
+        if (src != null && src.isNotEmpty) {
+          // Handle different URL formats
+          if (src.startsWith('//')) {
+            imageUrl = 'https:$src';
+          } else if (src.startsWith('/')) {
+            imageUrl = '$baseUrl$src';
+          } else if (src.startsWith('http')) {
+            imageUrl = src;
+          } else {
+            imageUrl = '$baseUrl/$src';
+          }
+          _logger.debug('Extracted image URL: $imageUrl');
+          break; // Found an image, stop looking
+        }
+      }
+    }
+    
+    if (imageUrl == null) {
+      _logger.debug('No product image found in details page with any selector');
+      
+      // Try to use cached image URL from the product grid/image fetch phase
+      final cachedImageUrl = _cachedImageUrls[productId];
+      if (cachedImageUrl != null && cachedImageUrl.isNotEmpty) {
+        imageUrl = cachedImageUrl;
+        _logger.debug('✓ Using cached image URL from grid phase: $imageUrl');
+      } else {
+        _logger.debug('No cached image URL found for product ID: $productId');
+      }
+      
+      // Debug: let's see what images are actually available
+      final allImages = document.querySelectorAll('img');
+      _logger.debug('Found ${allImages.length} total images in the page:');
+      for (int i = 0; i < allImages.length && i < 10; i++) { // Show more images for debugging
+        final img = allImages[i];
+        final id = img.attributes['id'] ?? 'no-id';
+        final className = img.attributes['class'] ?? 'no-class';
+        final src = img.attributes['src'] ?? 'no-src';
+        final alt = img.attributes['alt'] ?? 'no-alt';
+        _logger.debug('  Image $i: id="$id", class="$className", src="$src", alt="$alt"');
+      }
+      
+      // Also debug the page structure to see what we're actually getting
+      final title = document.querySelector('title')?.text ?? 'no-title';
+      _logger.debug('Page title: "$title"');
+      final h1Elements = document.querySelectorAll('h1');
+      if (h1Elements.isNotEmpty) {
+        _logger.debug('H1 elements found:');
+        for (int i = 0; i < h1Elements.length && i < 3; i++) {
+          _logger.debug('  H1 $i: "${h1Elements[i].text.trim()}"');
+        }
+      }
+    }
 
     // Use the passed order number directly (it's already the correct JFL order number)
     _logger.debug('Using order number: $orderNumber');
@@ -1578,13 +1658,14 @@ class JustFlightService {
         id: orderNumber,
         name: productName,
         description: description.isNotEmpty ? description : '',
-        imageUrl: '', // Would need to be extracted if present
+        imageUrl: imageUrl ?? '', // Use extracted image URL or empty string as fallback
         category: cachedCategory ?? 'Software', // Use cached category or fallback to 'Software'
         files: downloadableFiles,
         purchaseDate: purchaseDate ?? DateTime.now(),
         version: version ?? '1.0',
         sizeInMB: downloadableFiles.fold(0.0, (sum, file) => sum + file.sizeInMB),
       );
+      _logger.debug('Created detailed product with imageUrl: "${detailedProduct?.imageUrl}"');
     }
 
     _logger.debug('=== FINAL METADATA DEBUG ===');
