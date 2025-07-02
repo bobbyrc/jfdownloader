@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/product.dart';
 import '../providers/download_provider.dart';
-import '../providers/auth_provider.dart';
 
 class SimpleProductDetailsScreen extends StatelessWidget {
   final Product product;

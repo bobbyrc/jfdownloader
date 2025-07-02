@@ -6,6 +6,7 @@ import '../models/download_progress.dart';
 import '../providers/download_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/justflight_service.dart';
+import '../services/logger_service.dart';
 import '../widgets/cached_network_image.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   String? _orderNumber;
   DateTime? _purchaseDate;
   String? _version;
+  final _logger = LoggerService();
 
   @override
   void initState() {
@@ -57,15 +59,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       
       // Since we just successfully loaded products, we should still be logged in
       // Skip the login check to avoid potential session conflicts
-      print('Attempting to fetch detailed product info for: ${widget.product.name} (ID: ${widget.product.id})');
+      _logger.debug('Attempting to fetch detailed product info for: ${widget.product.name} (ID: ${widget.product.id})');
       
       try {
         final productDetails = await justFlightService.getProductDetails(widget.product.id);
         
-        print('Successfully fetched product details!');
-        print('  - Product info: ${productDetails['product'] != null ? 'Available' : 'Not available'}');
-        print('  - Files: ${(productDetails['files'] as List?)?.length ?? 0} files');
-        print('  - Installation info: ${(productDetails['installationInfo'] as Map?)?.length ?? 0} items');
+        _logger.info('Successfully fetched product details for ${widget.product.name}');
+        _logger.debug('  - Product info: ${productDetails['product'] != null ? 'Available' : 'Not available'}');
+        _logger.debug('  - Files: ${(productDetails['files'] as List?)?.length ?? 0} files');
+        _logger.debug('  - Installation info: ${(productDetails['installationInfo'] as Map?)?.length ?? 0} items');
         
         setState(() {
           if (productDetails['product'] != null) {
@@ -74,27 +76,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           final detailedFiles = productDetails['files'] as List<ProductFile>?;
           if (detailedFiles != null && detailedFiles.isNotEmpty) {
             _downloadableFiles = detailedFiles;
-            print('Updated downloadable files: ${detailedFiles.map((f) => f.name).join(', ')}');
+            _logger.debug('Updated downloadable files: ${detailedFiles.map((f) => f.name).join(', ')}');
           }
           _installationInfo = productDetails['installationInfo'] as Map<String, String>? ?? {};
           _orderNumber = productDetails['orderNumber'] as String?;
           _purchaseDate = productDetails['purchaseDate'] as DateTime?;
           _version = productDetails['version'] as String?;
           
-          // Debug extracted metadata
-          print('=== EXTRACTED METADATA ===');
-          print('Order Number: $_orderNumber');
-          print('Purchase Date: $_purchaseDate');
-          print('Version: $_version');
-          print('Raw orderNumber from service: ${productDetails['orderNumber']}');
-          print('Raw purchaseDate from service: ${productDetails['purchaseDate']}');
-          print('Raw version from service: ${productDetails['version']}');
-          print('========================');
-          
           _isLoading = false;
         });
       } catch (detailsError) {
-        print('Could not fetch detailed product info: $detailsError');
+        _logger.warning('Could not fetch detailed product info: $detailsError');
         setState(() {
           _error = 'Could not load detailed information - showing basic product details';
           _isLoading = false;

@@ -72,7 +72,7 @@ class JustFlightService {
     // Add cookie manager with proper persistence
     _dio.interceptors.add(CookieManager(_cookieJar));
 
-    // Add logging interceptor for debugging (disabled to reduce log noise)
+    // Add logging interceptor (disabled to reduce log noise)
     // _dio.interceptors.add(LogInterceptor(
     //   requestBody: false,
     //   responseBody: false,
@@ -96,7 +96,7 @@ class JustFlightService {
       
       _logger.debug('Login page loaded, parsing form...');
 
-      // Use the same robust form detection as debugLoginPage
+      // Use the same robust form detection as the login method
       final forms = loginDocument.querySelectorAll('form');
       if (forms.isEmpty) {
         _logger.warning('No forms found on page');
@@ -586,7 +586,7 @@ class JustFlightService {
       return null;
     }
     
-    // Log all cell contents for debugging
+    // Log all cell contents
     for (int i = 0; i < cells.length; i++) {
       final cellText = cells[i].text.trim();
       final dataSortAttr = cells[i].attributes['data-sort'];
@@ -1340,32 +1340,7 @@ class JustFlightService {
       final cachedImageUrl = _cachedImageUrls[productId];
       if (cachedImageUrl != null && cachedImageUrl.isNotEmpty) {
         imageUrl = cachedImageUrl;
-        _logger.debug('✓ Using cached image URL from grid phase: $imageUrl');
-      } else {
-        _logger.debug('No cached image URL found for product ID: $productId');
-      }
-      
-      // Debug: let's see what images are actually available
-      final allImages = document.querySelectorAll('img');
-      _logger.debug('Found ${allImages.length} total images in the page:');
-      for (int i = 0; i < allImages.length && i < 10; i++) { // Show more images for debugging
-        final img = allImages[i];
-        final id = img.attributes['id'] ?? 'no-id';
-        final className = img.attributes['class'] ?? 'no-class';
-        final src = img.attributes['src'] ?? 'no-src';
-        final alt = img.attributes['alt'] ?? 'no-alt';
-        _logger.debug('  Image $i: id="$id", class="$className", src="$src", alt="$alt"');
-      }
-      
-      // Also debug the page structure to see what we're actually getting
-      final title = document.querySelector('title')?.text ?? 'no-title';
-      _logger.debug('Page title: "$title"');
-      final h1Elements = document.querySelectorAll('h1');
-      if (h1Elements.isNotEmpty) {
-        _logger.debug('H1 elements found:');
-        for (int i = 0; i < h1Elements.length && i < 3; i++) {
-          _logger.debug('  H1 $i: "${h1Elements[i].text.trim()}"');
-        }
+        _logger.debug('Using cached image URL from grid phase');
       }
     }
 
@@ -1667,13 +1642,6 @@ class JustFlightService {
       );
       _logger.debug('Created detailed product with imageUrl: "${detailedProduct?.imageUrl}"');
     }
-
-    _logger.debug('=== FINAL METADATA DEBUG ===');
-    _logger.debug('Final orderNumber: $orderNumber');
-    _logger.debug('Final purchaseDate: $purchaseDate');  
-    _logger.debug('Final version: $version');
-    _logger.debug('============================');
-
     return {
       'product': detailedProduct,
       'files': downloadableFiles,
@@ -2093,85 +2061,7 @@ class JustFlightService {
     }
   }
 
-  /// Debug method to help troubleshoot login issues
-  Future<void> debugLoginPage() async {
-    await _initialize();
-    
-    try {
-      print('=== DEBUG: Fetching login page ===');
-      final response = await _dio.get(loginUrl);
-      final document = html_parser.parse(response.data);
-      
-      print('Response URL: ${response.realUri}');
-      print('Response status: ${response.statusCode}');
-      
-      // Find all forms
-      final forms = document.querySelectorAll('form');
-      print('Found ${forms.length} forms on the page');
-      
-      for (int i = 0; i < forms.length; i++) {
-        final form = forms[i];
-        print('\n--- Form $i ---');
-        print('Action: ${form.attributes['action']}');
-        print('Method: ${form.attributes['method']}');
-        print('Name: ${form.attributes['name']}');
-        print('ID: ${form.attributes['id']}');
-        
-        final inputs = form.querySelectorAll('input');
-        print('Inputs (${inputs.length}):');
-        for (final input in inputs) {
-          final type = input.attributes['type'] ?? 'text';
-          final name = input.attributes['name'] ?? 'unnamed';
-          final value = input.attributes['value'] ?? '';
-          final placeholder = input.attributes['placeholder'] ?? '';
-          print('  - $type: $name = "$value" (placeholder: "$placeholder")');
-        }
-      }
-      
-      // Look for common login indicators
-      final emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[name*="username"]');
-      final passwordInputs = document.querySelectorAll('input[type="password"]');
-      
-      print('\n=== Login Field Detection ===');
-      print('Email/Username fields found: ${emailInputs.length}');
-      for (final input in emailInputs) {
-        print('  - ${input.attributes['name']}: ${input.attributes['type']}');
-           }
-      
-      print('Password fields found: ${passwordInputs.length}');
-      for (final input in passwordInputs) {
-        print('  - ${input.attributes['name']}: ${input.attributes['type']}');
-      }
-      
-    } catch (e) {
-      print('Debug error: $e');
-    }
-  }
 
-  /// Debug method to check service state
-  Future<void> debugServiceState() async {
-    try {
-      print('\n=== Debug Service State ===');
-      final cookies = await _cookieJar.loadForRequest(Uri.parse(baseUrl));
-      print('Number of cookies: ${cookies.length}');
-      
-      for (final cookie in cookies) {
-        print('Cookie: ${cookie.name} = ${cookie.value}');
-        print('  Domain: ${cookie.domain}');
-        print('  Path: ${cookie.path}');
-        print('  Expires: ${cookie.expires}');
-        print('  HttpOnly: ${cookie.httpOnly}');
-        print('  Secure: ${cookie.secure}');
-      }
-      
-      final testResponse = await _dio.get('$baseUrl/account');
-      print('Test account access status: ${testResponse.statusCode}');
-      print('Final URL: ${testResponse.realUri}');
-      
-    } catch (e) {
-      print('Debug error: $e');
-    }
-  }
 
   /// Fetch both product image URL and category from the product page
   /// Returns a map with 'imageUrl' and 'category' keys

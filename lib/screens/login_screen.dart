@@ -1,13 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
-/// Login screen with debug auto-fill functionality
-/// 
-/// To disable auto-fill for production:
-/// 1. Set _debugAutoFill = false
-/// 2. Remove or secure the credentials.txt file
+/// Login screen for JustFlight Downloader
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,105 +16,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  String _autoFillStatus = 'Loading...';
-  
-  // Debug flag - set to true to auto-fill credentials for testing
-  // WARNING: Set to false before production release!
-  static const bool _debugAutoFill = true;
 
   @override
   void initState() {
     super.initState();
-    if (_debugAutoFill) {
-      _loadCredentialsForTesting();
-    }
-  }
-
-  Future<void> _loadCredentialsForTesting() async {
-    if (mounted) {
-      setState(() {
-        _autoFillStatus = 'Searching for credentials...';
-      });
-    }
-    
-    try {
-      final currentDir = Directory.current.path;
-      print('Searching for credentials file...');
-      print('Current working directory: $currentDir');
-      
-      // Try multiple possible locations for the credentials file
-      // When running Flutter in sandbox, we need to look in the app's data directory
-      final possiblePaths = [
-        'credentials.txt', // In the app's current directory (sandbox)
-        '$currentDir/credentials.txt', // Explicit current directory
-        '/Users/bcraig/code/jfdownloader/credentials.txt', // Original project location (may not work in sandbox)
-        '../credentials.txt', // One level up
-        '../../credentials.txt', // Two levels up
-      ];
-      
-      File? credentialsFile;
-      String? foundPath;
-      
-      for (final path in possiblePaths) {
-        final file = File(path);
-        print('Checking: $path');
-        try {
-          if (await file.exists()) {
-            credentialsFile = file;
-            foundPath = path;
-            print('✅ Found credentials file at: $path');
-            break;
-          } else {
-            print('❌ Not found: $path');
-          }
-        } catch (e) {
-          print('❌ Cannot access: $path (${e.toString()})');
-        }
-      }
-      
-      if (credentialsFile != null && foundPath != null) {
-        final lines = await credentialsFile.readAsLines();
-        print('Read ${lines.length} lines from credentials file');
-        
-        if (lines.length >= 2) {
-          final email = lines[0].trim();
-          final password = lines[1].trim();
-          
-          _emailController.text = email;
-          _passwordController.text = password;
-          
-          print('✅ Auto-filled credentials: ${email.substring(0, 3)}***@${email.split('@').last}');
-          
-          if (mounted) {
-            setState(() {
-              _autoFillStatus = 'Credentials loaded ✅';
-            });
-          }
-        } else {
-          print('❌ Credentials file found but does not have enough lines (needs email and password on separate lines)');
-          if (mounted) {
-            setState(() {
-              _autoFillStatus = 'Invalid file format (need 2 lines)';
-            });
-          }
-        }
-      } else {
-        print('❌ Credentials file not found in any location');
-        print('💡 Tip: Copy credentials.txt to the app\'s working directory: $currentDir');
-        if (mounted) {
-          setState(() {
-            _autoFillStatus = 'File not found - check console';
-          });
-        }
-      }
-    } catch (e) {
-      print('❌ Error loading credentials: $e');
-      if (mounted) {
-        setState(() {
-          _autoFillStatus = 'Error: ${e.toString().substring(0, 30)}...';
-        });
-      }
-    }
   }
 
   @override
@@ -176,40 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      
-                      // Debug indicator
-                      if (_debugAutoFill) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange, width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.bug_report_outlined,
-                                size: 16,
-                                color: Colors.orange[700],
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  'Debug Mode: $_autoFillStatus',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.orange[700],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                       
                       const SizedBox(height: 32),
                       Form(
@@ -324,37 +190,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 },
                               ),
                             ),
-                            
-                            // Debug: Clear credentials button
-                            if (_debugAutoFill) ...[
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        _emailController.clear();
-                                        _passwordController.clear();
-                                      },
-                                      child: const Text(
-                                        'Clear Fields',
-                                        style: TextStyle(fontSize: 14),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextButton(
-                                      onPressed: _loadCredentialsForTesting,
-                                      child: const Text(
-                                        'Load Credentials',
-                                        style: TextStyle(fontSize: 14),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
                           ],
                         ),
                       ),

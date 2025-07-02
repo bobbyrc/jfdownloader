@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import '../models/download_progress.dart';
 import '../models/product.dart';
 import '../services/download_service.dart';
+import '../services/logger_service.dart';
 
 class DownloadProvider extends ChangeNotifier {
   final DownloadService _downloadService = DownloadService();
+  final _logger = LoggerService();
   
   final Map<String, DownloadProgress> _downloads = {};
   final Map<String, ProductFile> _downloadFiles = {}; // Store ProductFile objects
@@ -193,17 +195,17 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   void cancelDownload(String fileId) {
-    print('DEBUG: cancelDownload called for fileId: $fileId');
+    _logger.debug('Cancel download requested for fileId: $fileId');
     final progress = _downloads[fileId];
     final file = _downloadFiles[fileId];
     
-    print('DEBUG: Found progress: ${progress != null}, status: ${progress?.status}');
-    print('DEBUG: Found file: ${file != null}');
+    _logger.debug('Found progress: ${progress != null}, status: ${progress?.status}');
+    _logger.debug('Found file: ${file != null}');
     
     if (progress != null) {
       // Cancel the actual download operation if it's in progress
       if (file != null && progress.status == DownloadStatus.downloading) {
-        print('DEBUG: Cancelling active download via service');
+        _logger.debug('Cancelling active download via service');
         _downloadService.cancelDownload(file.downloadUrl);
       }
       
@@ -213,17 +215,17 @@ class DownloadProvider extends ChangeNotifier {
         endTime: DateTime.now(),
       );
       _downloadQueue.remove(fileId);
-      print('DEBUG: Set status to cancelled, removed from queue');
+      _logger.debug('Set status to cancelled, removed from queue');
       notifyListeners();
     } else {
-      print('DEBUG: No progress found for fileId: $fileId');
+      _logger.debug('No progress found for fileId: $fileId');
     }
   }
 
   void retryDownload(String fileId) {
-    print('DEBUG: retryDownload called for fileId: $fileId');
+    _logger.debug('Retry download requested for fileId: $fileId');
     final progress = _downloads[fileId];
-    print('DEBUG: Current progress status: ${progress?.status}, error: ${progress?.error}');
+    _logger.debug('Current progress status: ${progress?.status}, error: ${progress?.error}');
     
     if (progress != null && (progress.status == DownloadStatus.failed || progress.status == DownloadStatus.cancelled)) {
       _downloads[fileId] = progress.copyWith(
@@ -235,7 +237,7 @@ class DownloadProvider extends ChangeNotifier {
         clearError: true,
       );
       
-      print('DEBUG: Updated progress to pending, error cleared');
+      _logger.debug('Updated progress to pending, error cleared');
       
       if (!_downloadQueue.contains(fileId)) {
         _downloadQueue.add(fileId);
@@ -244,7 +246,7 @@ class DownloadProvider extends ChangeNotifier {
       notifyListeners();
       _processDownloadQueue();
     } else {
-      print('DEBUG: Cannot retry - status: ${progress?.status}');
+      _logger.debug('Cannot retry - status: ${progress?.status}');
     }
   }
 

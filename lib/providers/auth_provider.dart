@@ -19,11 +19,6 @@ class AuthProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // For debugging - call debug method on first attempt
-      if (!_isLoggedIn) {
-        await _justFlightService.debugLoginPage();
-      }
-      
       final success = await _justFlightService.login(email, password);
       if (success) {
         _isLoggedIn = true;
