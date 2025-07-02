@@ -50,25 +50,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     try {
       // Check if we're still logged in via the AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       if (!authProvider.isLoggedIn) {
         throw Exception('Not logged in. Please log in again.');
       }
 
       final justFlightService = JustFlightService();
-      
+
       // Since we just successfully loaded products, we should still be logged in
       // Skip the login check to avoid potential session conflicts
-      _logger.debug('Attempting to fetch detailed product info for: ${widget.product.name} (ID: ${widget.product.id})');
-      
+      _logger.debug(
+          'Attempting to fetch detailed product info for: ${widget.product.name} (ID: ${widget.product.id})');
+
       try {
-        final productDetails = await justFlightService.getProductDetails(widget.product.id);
-        
-        _logger.info('Successfully fetched product details for ${widget.product.name}');
-        _logger.debug('  - Product info: ${productDetails['product'] != null ? 'Available' : 'Not available'}');
-        _logger.debug('  - Files: ${(productDetails['files'] as List?)?.length ?? 0} files');
-        _logger.debug('  - Installation info: ${(productDetails['installationInfo'] as Map?)?.length ?? 0} items');
-        
+        final productDetails =
+            await justFlightService.getProductDetails(widget.product.id);
+
+        _logger.info(
+            'Successfully fetched product details for ${widget.product.name}');
+        _logger.debug(
+            '  - Product info: ${productDetails['product'] != null ? 'Available' : 'Not available'}');
+        _logger.debug(
+            '  - Files: ${(productDetails['files'] as List?)?.length ?? 0} files');
+        _logger.debug(
+            '  - Installation info: ${(productDetails['installationInfo'] as Map?)?.length ?? 0} items');
+
         setState(() {
           if (productDetails['product'] != null) {
             _detailedProduct = productDetails['product'] as Product;
@@ -76,32 +82,36 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           final detailedFiles = productDetails['files'] as List<ProductFile>?;
           if (detailedFiles != null && detailedFiles.isNotEmpty) {
             _downloadableFiles = detailedFiles;
-            _logger.debug('Updated downloadable files: ${detailedFiles.map((f) => f.name).join(', ')}');
+            _logger.debug(
+                'Updated downloadable files: ${detailedFiles.map((f) => f.name).join(', ')}');
           }
-          _installationInfo = productDetails['installationInfo'] as Map<String, String>? ?? {};
+          _installationInfo =
+              productDetails['installationInfo'] as Map<String, String>? ?? {};
           _orderNumber = productDetails['orderNumber'] as String?;
           _purchaseDate = productDetails['purchaseDate'] as DateTime?;
           _version = productDetails['version'] as String?;
-          
+
           _isLoading = false;
         });
       } catch (detailsError) {
         _logger.warning('Could not fetch detailed product info: $detailsError');
         setState(() {
-          _error = 'Could not load detailed information - showing basic product details';
+          _error =
+              'Could not load detailed information - showing basic product details';
           _isLoading = false;
         });
       }
-      
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
         // Keep the fallback data we already set
       });
-      
+
       // If it's a login/session error, show a helpful message
-      if (e.toString().contains('logged in') || e.toString().contains('session') || e.toString().contains('login')) {
+      if (e.toString().contains('logged in') ||
+          e.toString().contains('session') ||
+          e.toString().contains('login')) {
         _showLoginErrorDialog();
       }
     }
@@ -109,7 +119,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   void _showLoginErrorDialog() {
     if (!mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -122,9 +132,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
               Navigator.of(context).pop(); // Go back to main screen
-              
+
               // Trigger logout to show login screen
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider =
+                  Provider.of<AuthProvider>(context, listen: false);
               authProvider.logout();
             },
             child: const Text('Log In Again'),
@@ -143,7 +154,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           if (!_isLoading && _downloadableFiles.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.download),
-              onPressed: () => _downloadAllFiles(),
+              onPressed: _downloadAllFiles,
               tooltip: 'Download All Files',
             ),
         ],
@@ -173,8 +184,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         children: [
           _buildProductHeader(),
           const Divider(),
-          if (_error != null && _installationInfo.isEmpty) 
-            _buildErrorBanner(),
+          if (_error != null && _installationInfo.isEmpty) _buildErrorBanner(),
           _buildInstallationInfo(),
           if (_installationInfo.isNotEmpty) const Divider(),
           _buildDownloadableFiles(),
@@ -205,16 +215,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 Text(
                   'Limited Information Available',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Could not load detailed product information. Showing basic details only.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                 ),
               ],
             ),
@@ -235,7 +245,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _buildProductHeader() {
     final product = _detailedProduct ?? widget.product;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -246,7 +256,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: product.imageUrl.isNotEmpty
@@ -254,16 +264,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     child: CachedNetworkImage(
                       imageUrl: product.imageUrl,
-                      fit: BoxFit.cover,
                       placeholder: _buildPlaceholderImage(),
                       errorWidget: _buildPlaceholderImage(),
                     ),
                   )
                 : _buildPlaceholderImage(),
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // Product info
           Expanded(
             child: Column(
@@ -272,14 +281,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 Text(
                   product.name,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(16),
@@ -292,17 +300,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 12),
-                
                 if (product.description.isNotEmpty)
                   Text(
                     product.description,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                
                 const SizedBox(height: 12),
-                
                 Row(
                   children: [
                     Icon(
@@ -317,9 +321,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ],
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Row(
                   children: [
                     Icon(
@@ -334,9 +336,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ],
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Row(
                   children: [
                     Icon(
@@ -392,43 +392,43 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           Text(
             'Installation Information',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
-          
           const SizedBox(height: 12),
-          
           ..._installationInfo.entries.map((entry) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 120,
-                  child: Text(
-                    '${entry.key}:',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: Text(
+                        '${entry.key}:',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Text(
-                    entry.value,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
   }
 
   Widget _buildDownloadableFiles() {
-    final files = _downloadableFiles.isNotEmpty ? _downloadableFiles : widget.product.files;
-    
+    final files = _downloadableFiles.isNotEmpty
+        ? _downloadableFiles
+        : widget.product.files;
+
     if (files.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -465,21 +465,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               Text(
                 'Downloadable Files',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const Spacer(),
               Text(
                 '${files.length} files',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ],
           ),
-          
           const SizedBox(height: 12),
-          
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -497,84 +495,101 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _buildFileCard(ProductFile file) {
     return Consumer<DownloadProvider>(
-      builder: (context, downloadProvider, child) {      final progress = downloadProvider.getDownloadProgress(file.id);
-      final isDownloading = progress != null && progress.status.name != 'completed';
-      final isDownloaded = file.isDownloaded;
+      builder: (context, downloadProvider, child) {
+        final progress = downloadProvider.getDownloadProgress(file.id);
+        final isDownloading =
+            progress != null && progress.status.name != 'completed';
+        final isDownloaded = file.isDownloaded;
 
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    _getFileIcon(file.fileType),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          file.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              file.fileType.toUpperCase(),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            if (file.sizeInMB > 0) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '•',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${file.sizeInMB.toStringAsFixed(1)} MB',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _getFileIcon(file.fileType),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildDownloadActions(file, progress),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            file.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                file.fileType.toUpperCase(),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                              ),
+                              if (file.sizeInMB > 0) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  '•',
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${file.sizeInMB.toStringAsFixed(1)} MB',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildDownloadActions(file, progress),
+                  ],
+                ),
+
+                // Download progress and error display
+                if (progress != null) ...[
+                  const SizedBox(height: 12),
+                  _buildDownloadStatus(progress),
                 ],
-              ),
-              
-              // Download progress and error display
-              if (progress != null) ...[
-                const SizedBox(height: 12),
-                _buildDownloadStatus(progress),
               ],
-            ],
+            ),
           ),
-        ),
-      );
+        );
       },
     );
   }
 
   Widget _buildDownloadActions(ProductFile file, DownloadProgress? progress) {
     final isDownloaded = file.isDownloaded;
-    
+
     if (progress == null) {
       // No download in progress - show download button
       return ElevatedButton.icon(
@@ -582,8 +597,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         icon: Icon(isDownloaded ? Icons.check : Icons.download),
         label: Text(isDownloaded ? 'Downloaded' : 'Download'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDownloaded 
-              ? Theme.of(context).colorScheme.surfaceVariant
+          backgroundColor: isDownloaded
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
               : null,
         ),
       );
@@ -598,7 +613,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           icon: const Icon(Icons.close),
           tooltip: 'Cancel Download',
         );
-      
+
       case DownloadStatus.completed:
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -611,33 +626,35 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             Text(
               'Completed',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
             ),
           ],
         );
-      
+
       case DownloadStatus.failed:
       case DownloadStatus.cancelled:
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextButton.icon(
-              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                  .retryDownload(file.id),
+              onPressed: () =>
+                  Provider.of<DownloadProvider>(context, listen: false)
+                      .retryDownload(file.id),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
             const SizedBox(width: 4),
             IconButton(
-              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                  .cancelDownload(file.id),
+              onPressed: () =>
+                  Provider.of<DownloadProvider>(context, listen: false)
+                      .cancelDownload(file.id),
               icon: const Icon(Icons.close),
               tooltip: 'Remove',
             ),
           ],
         );
-      
+
       case DownloadStatus.pending:
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -651,28 +668,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             const Text('Queued'),
             const SizedBox(width: 8),
             IconButton(
-              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                  .cancelDownload(file.id),
+              onPressed: () =>
+                  Provider.of<DownloadProvider>(context, listen: false)
+                      .cancelDownload(file.id),
               icon: const Icon(Icons.close),
               tooltip: 'Cancel',
             ),
           ],
         );
-      
+
       case DownloadStatus.paused:
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextButton.icon(
-              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                  .resumeDownload(file.id),
+              onPressed: () =>
+                  Provider.of<DownloadProvider>(context, listen: false)
+                      .resumeDownload(file.id),
               icon: const Icon(Icons.play_arrow),
               label: const Text('Resume'),
             ),
             const SizedBox(width: 4),
             IconButton(
-              onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                  .cancelDownload(file.id),
+              onPressed: () =>
+                  Provider.of<DownloadProvider>(context, listen: false)
+                      .cancelDownload(file.id),
               icon: const Icon(Icons.close),
               tooltip: 'Cancel',
             ),
@@ -688,7 +708,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         if (progress.status == DownloadStatus.downloading) ...[
           LinearProgressIndicator(
             value: progress.progress,
-            backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
           ),
           const SizedBox(height: 4),
           Row(
@@ -705,7 +726,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ],
           ),
         ],
-        
+
         // Error message
         if (progress.error != null)
           Container(
@@ -766,7 +787,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
       if (selectedDirectory == null) return;
 
-      final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
       await downloadProvider.downloadFile(file, selectedDirectory);
 
       if (mounted) {
@@ -796,9 +818,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
       if (selectedDirectory == null) return;
 
-      final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
-      final filesToDownload = _downloadableFiles.isNotEmpty ? _downloadableFiles : widget.product.files;
-      
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      final filesToDownload = _downloadableFiles.isNotEmpty
+          ? _downloadableFiles
+          : widget.product.files;
+
       for (final file in filesToDownload) {
         if (!file.isDownloaded) {
           await downloadProvider.downloadFile(file, selectedDirectory);
@@ -808,7 +833,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Started downloading all files for ${widget.product.name}'),
+            content: Text(
+                'Started downloading all files for ${widget.product.name}'),
           ),
         );
       }

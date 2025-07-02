@@ -24,7 +24,8 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     // Load products when the screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductProvider>(context, listen: false).loadProducts(fetchImages: _fetchImages);
+      Provider.of<ProductProvider>(context, listen: false)
+          .loadProducts(fetchImages: _fetchImages);
     });
   }
 
@@ -49,7 +50,8 @@ class _MainScreenState extends State<MainScreen> {
                   isLabelVisible: activeDownloads > 0,
                   child: const Icon(Icons.download),
                 ),
-                onPressed: () => setState(() => _showDownloadPanel = !_showDownloadPanel),
+                onPressed: () =>
+                    setState(() => _showDownloadPanel = !_showDownloadPanel),
                 tooltip: 'Downloads',
               );
             },
@@ -64,7 +66,10 @@ class _MainScreenState extends State<MainScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh),
-                onPressed: productProvider.isLoading ? null : () => productProvider.refreshProducts(fetchImages: _fetchImages),
+                onPressed: productProvider.isLoading
+                    ? null
+                    : () => productProvider.refreshProducts(
+                        fetchImages: _fetchImages),
                 tooltip: 'Refresh',
               );
             },
@@ -75,17 +80,18 @@ class _MainScreenState extends State<MainScreen> {
               return PopupMenuButton<String>(
                 tooltip: 'Account',
                 icon: const Icon(Icons.account_circle),
-                onSelected: (value) {                switch (value) {
-                  case 'logout':
-                    _handleLogout();
-                    break;
-                  case 'settings':
-                    _showSettings();
-                    break;
-                  case 'advanced':
-                    _showAdvancedSettings();
-                    break;
-                }
+                onSelected: (value) {
+                  switch (value) {
+                    case 'logout':
+                      _handleLogout();
+                      break;
+                    case 'settings':
+                      _showSettings();
+                      break;
+                    case 'advanced':
+                      _showAdvancedSettings();
+                      break;
+                  }
                 },
                 itemBuilder: (context) => [
                   if (authProvider.username != null)
@@ -142,7 +148,10 @@ class _MainScreenState extends State<MainScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+              color: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withOpacity(0.3),
               border: Border(
                 bottom: BorderSide(
                   color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
@@ -151,7 +160,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             child: const CustomSearchBar(),
           ),
-          
+
           // Main content area
           Expanded(
             child: Row(
@@ -161,7 +170,8 @@ class _MainScreenState extends State<MainScreen> {
                   flex: _showDownloadPanel ? 2 : 1,
                   child: Consumer<ProductProvider>(
                     builder: (context, productProvider, child) {
-                      if (productProvider.isLoading && productProvider.products.isEmpty) {
+                      if (productProvider.isLoading &&
+                          productProvider.products.isEmpty) {
                         return const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -182,17 +192,21 @@ class _MainScreenState extends State<MainScreen> {
                             children: [
                               // Products are loaded, show them with progress overlay
                               if (productProvider.products.isNotEmpty) ...[
-                                Expanded(
-                                  child: const ProductGrid(),
+                                const Expanded(
+                                  child: ProductGrid(),
                                 ),
                                 // Progress overlay at the bottom
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.surface,
+                                    color:
+                                        Theme.of(context).colorScheme.surface,
                                     border: Border(
                                       top: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outline
+                                            .withOpacity(0.2),
                                       ),
                                     ),
                                   ),
@@ -206,20 +220,28 @@ class _MainScreenState extends State<MainScreen> {
                                           Expanded(
                                             child: Text(
                                               productProvider.progressMessage,
-                                              style: Theme.of(context).textTheme.bodyMedium,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium,
                                             ),
                                           ),
                                           Text(
                                             '${productProvider.completedProducts}/${productProvider.totalProducts}',
-                                            style: Theme.of(context).textTheme.bodySmall,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall,
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
                                       LinearProgressIndicator(
                                         value: productProvider.imageProgress,
-                                        backgroundColor: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .outline
+                                            .withOpacity(0.2),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
                                           Theme.of(context).colorScheme.primary,
                                         ),
                                       ),
@@ -239,7 +261,10 @@ class _MainScreenState extends State<MainScreen> {
                                   width: 300,
                                   child: LinearProgressIndicator(
                                     value: productProvider.imageProgress,
-                                    backgroundColor: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .outline
+                                        .withOpacity(0.2),
                                     valueColor: AlwaysStoppedAnimation<Color>(
                                       Theme.of(context).colorScheme.primary,
                                     ),
@@ -269,19 +294,23 @@ class _MainScreenState extends State<MainScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 'Error loading products',
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall,
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 productProvider.error!,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
-                                onPressed: () => productProvider.refreshProducts(),
+                                onPressed: () =>
+                                    productProvider.refreshProducts(),
                                 icon: const Icon(Icons.refresh),
                                 label: const Text('Retry'),
                               ),
@@ -298,12 +327,15 @@ class _MainScreenState extends State<MainScreen> {
                               Icon(
                                 Icons.inventory_2_outlined,
                                 size: 64,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'No products found',
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall,
                               ),
                               const SizedBox(height: 8),
                               const Text(
@@ -312,7 +344,8 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
-                                onPressed: () => productProvider.refreshProducts(),
+                                onPressed: () =>
+                                    productProvider.refreshProducts(),
                                 icon: const Icon(Icons.refresh),
                                 label: const Text('Refresh'),
                               ),
@@ -325,7 +358,7 @@ class _MainScreenState extends State<MainScreen> {
                     },
                   ),
                 ),
-                
+
                 // Download panel
                 if (_showDownloadPanel)
                   Container(
@@ -333,7 +366,10 @@ class _MainScreenState extends State<MainScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         left: BorderSide(
-                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.2),
                         ),
                       ),
                     ),
@@ -388,7 +424,8 @@ class _MainScreenState extends State<MainScreen> {
                 const Divider(),
                 SwitchListTile(
                   title: const Text('Fetch High-Quality Images'),
-                  subtitle: const Text('Download product images from JustFlight website\n(slower but better looking)'),
+                  subtitle: const Text(
+                      'Download product images from JustFlight website\n(slower but better looking)'),
                   value: _fetchImages,
                   onChanged: (value) {
                     setState(() {
@@ -397,7 +434,8 @@ class _MainScreenState extends State<MainScreen> {
                     Navigator.of(context).pop();
                     // Optionally refresh products if toggling to enable images
                     if (value) {
-                      Provider.of<ProductProvider>(context, listen: false).refreshProducts(fetchImages: true);
+                      Provider.of<ProductProvider>(context, listen: false)
+                          .refreshProducts();
                     }
                   },
                 ),

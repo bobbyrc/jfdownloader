@@ -50,7 +50,7 @@ class SimpleProductDetailsScreen extends StatelessWidget {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: product.imageUrl.isNotEmpty
@@ -66,9 +66,9 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                   )
                 : _buildPlaceholderImage(context),
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // Product info
           Expanded(
             child: Column(
@@ -77,14 +77,13 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                 Text(
                   product.name,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(16),
@@ -97,17 +96,13 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 12),
-                
                 if (product.description.isNotEmpty)
                   Text(
                     product.description,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                
                 const SizedBox(height: 12),
-                
                 Row(
                   children: [
                     Icon(
@@ -122,9 +117,7 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Row(
                   children: [
                     Icon(
@@ -171,7 +164,7 @@ class SimpleProductDetailsScreen extends StatelessWidget {
 
   Widget _buildDownloadableFiles(BuildContext context) {
     final files = product.files;
-    
+
     if (files.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -208,21 +201,19 @@ class SimpleProductDetailsScreen extends StatelessWidget {
               Text(
                 'Downloadable Files',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const Spacer(),
               Text(
                 '${files.length} files',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ],
           ),
-          
           const SizedBox(height: 12),
-          
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -242,7 +233,8 @@ class SimpleProductDetailsScreen extends StatelessWidget {
     return Consumer<DownloadProvider>(
       builder: (context, downloadProvider, child) {
         final progress = downloadProvider.getDownloadProgress(file.id);
-        final isDownloading = progress != null && progress.status.name != 'completed';
+        final isDownloading =
+            progress != null && progress.status.name != 'completed';
         final isDownloaded = file.isDownloaded;
 
         return Card(
@@ -264,33 +256,48 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                         children: [
                           Text(
                             file.name,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
                           ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
                               Text(
                                 file.fileType.toUpperCase(),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
                               ),
                               if (file.sizeInMB > 0) ...[
                                 const SizedBox(width: 8),
                                 Text(
                                   '•',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   '${file.sizeInMB.toStringAsFixed(1)} MB',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
                                 ),
                               ],
                             ],
@@ -300,26 +307,30 @@ class SimpleProductDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     if (isDownloading)
-                      _buildDownloadProgress(context, progress!)
+                      _buildDownloadProgress(context, progress)
                     else
                       ElevatedButton.icon(
-                        onPressed: isDownloaded ? null : () => _downloadFile(context, file),
+                        onPressed: isDownloaded
+                            ? null
+                            : () => _downloadFile(context, file),
                         icon: Icon(isDownloaded ? Icons.check : Icons.download),
                         label: Text(isDownloaded ? 'Downloaded' : 'Download'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDownloaded 
-                              ? Theme.of(context).colorScheme.surfaceVariant
+                          backgroundColor: isDownloaded
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
                               : null,
                         ),
                       ),
                   ],
                 ),
-                
                 if (isDownloading) ...[
                   const SizedBox(height: 12),
                   LinearProgressIndicator(
-                    value: progress!.progress,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                    value: progress.progress,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -390,7 +401,8 @@ class SimpleProductDetailsScreen extends StatelessWidget {
 
       if (selectedDirectory == null) return;
 
-      final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
       await downloadProvider.downloadFile(file, selectedDirectory);
 
       if (context.mounted) {
@@ -420,8 +432,9 @@ class SimpleProductDetailsScreen extends StatelessWidget {
 
       if (selectedDirectory == null) return;
 
-      final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
-      
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+
       for (final file in product.files) {
         if (!file.isDownloaded) {
           await downloadProvider.downloadFile(file, selectedDirectory);

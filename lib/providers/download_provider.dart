@@ -7,9 +7,10 @@ import '../services/logger_service.dart';
 class DownloadProvider extends ChangeNotifier {
   final DownloadService _downloadService = DownloadService();
   final _logger = LoggerService();
-  
+
   final Map<String, DownloadProgress> _downloads = {};
-  final Map<String, ProductFile> _downloadFiles = {}; // Store ProductFile objects
+  final Map<String, ProductFile> _downloadFiles =
+      {}; // Store ProductFile objects
   final List<String> _downloadQueue = [];
   bool _isDownloading = false;
   int _maxConcurrentDownloads = 3;
@@ -18,20 +19,24 @@ class DownloadProvider extends ChangeNotifier {
   List<String> get downloadQueue => List.unmodifiable(_downloadQueue);
   bool get isDownloading => _isDownloading;
   int get maxConcurrentDownloads => _maxConcurrentDownloads;
-  
-  List<DownloadProgress> get activeDownloads => 
-    _downloads.values.where((d) => d.status == DownloadStatus.downloading).toList();
-    
-  List<DownloadProgress> get completedDownloads => 
-    _downloads.values.where((d) => d.status == DownloadStatus.completed).toList();
-    
-  List<DownloadProgress> get failedDownloads => 
-    _downloads.values.where((d) => d.status == DownloadStatus.failed).toList();
+
+  List<DownloadProgress> get activeDownloads => _downloads.values
+      .where((d) => d.status == DownloadStatus.downloading)
+      .toList();
+
+  List<DownloadProgress> get completedDownloads => _downloads.values
+      .where((d) => d.status == DownloadStatus.completed)
+      .toList();
+
+  List<DownloadProgress> get failedDownloads => _downloads.values
+      .where((d) => d.status == DownloadStatus.failed)
+      .toList();
 
   double get totalProgress {
     if (_downloads.isEmpty) return 0.0;
-    
-    final total = _downloads.values.fold<double>(0.0, (sum, d) => sum + d.progress);
+
+    final total =
+        _downloads.values.fold<double>(0.0, (sum, d) => sum + d.progress);
     return total / _downloads.length;
   }
 
@@ -77,35 +82,36 @@ class DownloadProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    
+
     _isDownloading = true;
-    
-    while (_downloadQueue.isNotEmpty && activeDownloads.length < _maxConcurrentDownloads) {
+
+    while (_downloadQueue.isNotEmpty &&
+        activeDownloads.length < _maxConcurrentDownloads) {
       final fileId = _downloadQueue.removeAt(0);
       final progress = _downloads[fileId];
-      
+
       if (progress != null && progress.status == DownloadStatus.pending) {
         _startDownload(fileId);
       }
     }
-    
+
     // Check if all downloads are complete
     if (activeDownloads.isEmpty && _downloadQueue.isEmpty) {
       _isDownloading = false;
     }
-    
+
     notifyListeners();
   }
 
   String _formatErrorMessage(Object error) {
     final errorStr = error.toString();
-    
+
     // Remove "Exception:" prefix if present
     String cleanError = errorStr;
     if (cleanError.startsWith('Exception: ')) {
       cleanError = cleanError.substring(11);
     }
-    
+
     // Map technical errors to user-friendly messages
     if (cleanError.toLowerCase().contains('cancelled')) {
       return 'Download cancelled';
@@ -129,13 +135,14 @@ class DownloadProvider extends ChangeNotifier {
   Future<void> _startDownload(String fileId) async {
     final progress = _downloads[fileId];
     final file = _downloadFiles[fileId];
-    
+
     if (progress == null || file == null) {
       return;
     }
 
     try {
-      _downloads[fileId] = progress.copyWith(status: DownloadStatus.downloading);
+      _downloads[fileId] =
+          progress.copyWith(status: DownloadStatus.downloading);
       notifyListeners();
 
       // Use the actual download URL from the ProductFile
@@ -148,7 +155,7 @@ class DownloadProvider extends ChangeNotifier {
             totalBytes: total.toDouble(),
             progress: downloaded / total,
           );
-          
+
           if (updatedProgress != null) {
             _downloads[fileId] = updatedProgress;
             notifyListeners();
@@ -198,17 +205,18 @@ class DownloadProvider extends ChangeNotifier {
     _logger.debug('Cancel download requested for fileId: $fileId');
     final progress = _downloads[fileId];
     final file = _downloadFiles[fileId];
-    
-    _logger.debug('Found progress: ${progress != null}, status: ${progress?.status}');
+
+    _logger.debug(
+        'Found progress: ${progress != null}, status: ${progress?.status}');
     _logger.debug('Found file: ${file != null}');
-    
+
     if (progress != null) {
       // Cancel the actual download operation if it's in progress
       if (file != null && progress.status == DownloadStatus.downloading) {
         _logger.debug('Cancelling active download via service');
         _downloadService.cancelDownload(file.downloadUrl);
       }
-      
+
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.cancelled,
         error: 'Download cancelled',
@@ -225,24 +233,26 @@ class DownloadProvider extends ChangeNotifier {
   void retryDownload(String fileId) {
     _logger.debug('Retry download requested for fileId: $fileId');
     final progress = _downloads[fileId];
-    _logger.debug('Current progress status: ${progress?.status}, error: ${progress?.error}');
-    
-    if (progress != null && (progress.status == DownloadStatus.failed || progress.status == DownloadStatus.cancelled)) {
+    _logger.debug(
+        'Current progress status: ${progress?.status}, error: ${progress?.error}');
+
+    if (progress != null &&
+        (progress.status == DownloadStatus.failed ||
+            progress.status == DownloadStatus.cancelled)) {
       _downloads[fileId] = progress.copyWith(
         status: DownloadStatus.pending,
         downloadedBytes: 0,
         progress: 0,
         startTime: DateTime.now(),
-        endTime: null,
         clearError: true,
       );
-      
+
       _logger.debug('Updated progress to pending, error cleared');
-      
+
       if (!_downloadQueue.contains(fileId)) {
         _downloadQueue.add(fileId);
       }
-      
+
       notifyListeners();
       _processDownloadQueue();
     } else {
@@ -251,7 +261,8 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   void clearCompletedDownloads() {
-    _downloads.removeWhere((key, value) => value.status == DownloadStatus.completed);
+    _downloads
+        .removeWhere((key, value) => value.status == DownloadStatus.completed);
     notifyListeners();
   }
 

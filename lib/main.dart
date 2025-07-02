@@ -12,18 +12,18 @@ import 'services/performance_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize services
   LoggerService.initialize();
   await CacheService.initialize();
   await PerformanceService.initialize();
-  
+
   final logger = LoggerService();
   logger.info('Starting JustFlight Downloader');
-  
+
   // Initialize window manager for desktop
   await windowManager.ensureInitialized();
-  
+
   WindowOptions windowOptions = const WindowOptions(
     size: Size(1200, 800),
     minimumSize: Size(800, 600),
@@ -33,7 +33,7 @@ void main() async {
     titleBarStyle: TitleBarStyle.normal,
     title: 'JustFlight Downloader',
   );
-  
+
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
     await windowManager.focus();
@@ -60,7 +60,6 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF1976D2),
-            brightness: Brightness.light,
           ),
           appBarTheme: const AppBarTheme(
             centerTitle: true,
@@ -92,7 +91,9 @@ class MyApp extends StatelessWidget {
         ),
         home: Consumer<AuthProvider>(
           builder: (context, authProvider, child) {
-            return authProvider.isLoggedIn ? const MainScreen() : const LoginScreen();
+            return authProvider.isLoggedIn
+                ? const MainScreen()
+                : const LoginScreen();
           },
         ),
       ),

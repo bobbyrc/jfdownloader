@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/download_provider.dart';
 import '../services/cache_service.dart';
-import '../services/performance_service.dart';
 import '../services/logger_service.dart';
+import '../services/performance_service.dart';
 
 class AdvancedSettingsScreen extends StatefulWidget {
   const AdvancedSettingsScreen({super.key});
@@ -15,7 +16,7 @@ class AdvancedSettingsScreen extends StatefulWidget {
 class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
   final CacheService _cache = CacheService();
   final PerformanceService _performance = PerformanceService();
-  
+
   bool _enablePerformanceMonitoring = false;
   bool _enableImageCaching = true;
   bool _enableDebugLogging = false;
@@ -61,8 +62,8 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                 Text(
                   'Performance',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -76,10 +77,12 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                   _enablePerformanceMonitoring = value;
                 });
                 if (value) {
-                  LoggerService().info('Performance monitoring enabled', 'Settings');
+                  LoggerService()
+                      .info('Performance monitoring enabled', 'Settings');
                 } else {
                   _performance.clearMetrics();
-                  LoggerService().info('Performance monitoring disabled', 'Settings');
+                  LoggerService()
+                      .info('Performance monitoring disabled', 'Settings');
                 }
               },
             ),
@@ -107,13 +110,14 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.storage, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.storage,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Cache & Storage',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -139,7 +143,8 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                 builder: (context, snapshot) {
                   final stats = snapshot.data;
                   if (stats != null) {
-                    final totalItems = stats.values.fold(0, (sum, count) => sum + count);
+                    final totalItems =
+                        stats.values.fold(0, (sum, count) => sum + count);
                     return Text('$totalItems cached items');
                   }
                   return const Text('Tap to clear all cached data');
@@ -163,13 +168,14 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.download, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.download,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Downloads',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -180,23 +186,30 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                   children: [
                     ListTile(
                       title: const Text('Concurrent Downloads'),
-                      subtitle: Text('Current limit: ${downloadProvider.maxConcurrentDownloads}'),
+                      subtitle: Text(
+                          'Current limit: ${downloadProvider.maxConcurrentDownloads}'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.remove),
-                            onPressed: downloadProvider.maxConcurrentDownloads > 1
-                                ? () => downloadProvider.setMaxConcurrentDownloads(
-                                    downloadProvider.maxConcurrentDownloads - 1)
+                            onPressed: downloadProvider.maxConcurrentDownloads >
+                                    1
+                                ? () => downloadProvider
+                                    .setMaxConcurrentDownloads(downloadProvider
+                                            .maxConcurrentDownloads -
+                                        1)
                                 : null,
                           ),
                           Text('${downloadProvider.maxConcurrentDownloads}'),
                           IconButton(
                             icon: const Icon(Icons.add),
-                            onPressed: downloadProvider.maxConcurrentDownloads < 10
-                                ? () => downloadProvider.setMaxConcurrentDownloads(
-                                    downloadProvider.maxConcurrentDownloads + 1)
+                            onPressed: downloadProvider.maxConcurrentDownloads <
+                                    10
+                                ? () => downloadProvider
+                                    .setMaxConcurrentDownloads(downloadProvider
+                                            .maxConcurrentDownloads +
+                                        1)
                                 : null,
                           ),
                         ],
@@ -205,7 +218,8 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                     const Divider(),
                     ListTile(
                       title: const Text('Download History'),
-                      subtitle: Text('${downloadProvider.completedDownloads.length} completed downloads'),
+                      subtitle: Text(
+                          '${downloadProvider.completedDownloads.length} completed downloads'),
                       trailing: const Icon(Icons.history),
                       onTap: () {
                         // Could navigate to download history screen
@@ -230,29 +244,30 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.bug_report, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.bug_report,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Debugging',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             SwitchListTile(
               title: const Text('Debug Logging'),
-              subtitle: const Text('Enable detailed logging for troubleshooting'),
+              subtitle:
+                  const Text('Enable detailed logging for troubleshooting'),
               value: _enableDebugLogging,
               onChanged: (value) {
                 setState(() {
                   _enableDebugLogging = value;
                 });
                 LoggerService().info(
-                  'Debug logging ${value ? 'enabled' : 'disabled'}', 
-                  'Settings'
-                );
+                    'Debug logging ${value ? 'enabled' : 'disabled'}',
+                    'Settings');
               },
             ),
           ],
@@ -270,13 +285,14 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.healing, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.healing,
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Diagnostics',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -311,15 +327,15 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Network Operations:', style: Theme.of(context).textTheme.titleSmall),
-              ...(_performance.getNetworkMetrics().entries.map((e) => 
-                Text('${e.key}: ${e.value['count']} ops, avg ${e.value['average_ms']}ms')
-              )),
+              Text('Network Operations:',
+                  style: Theme.of(context).textTheme.titleSmall),
+              ...(_performance.getNetworkMetrics().entries.map((e) => Text(
+                  '${e.key}: ${e.value['count']} ops, avg ${e.value['average_ms']}ms'))),
               const SizedBox(height: 8),
-              Text('Image Loading:', style: Theme.of(context).textTheme.titleSmall),
-              ...(_performance.getImageMetrics().entries.map((e) => 
-                Text('${e.key}: ${e.value['count']} ops, avg ${e.value['average_ms']}ms')
-              )),
+              Text('Image Loading:',
+                  style: Theme.of(context).textTheme.titleSmall),
+              ...(_performance.getImageMetrics().entries.map((e) => Text(
+                  '${e.key}: ${e.value['count']} ops, avg ${e.value['average_ms']}ms'))),
             ],
           ),
         ),
@@ -338,7 +354,8 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear Cache'),
-        content: const Text('This will clear all cached images and data. Continue?'),
+        content:
+            const Text('This will clear all cached images and data. Continue?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -376,10 +393,10 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
 
     // Simulate diagnostics
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (mounted) {
       Navigator.of(context).pop(); // Close progress dialog
-      
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(

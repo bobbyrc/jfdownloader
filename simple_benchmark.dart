@@ -57,7 +57,7 @@ Future<void> runIOBenchmark() async {
 
 Future<void> runComputeBenchmark() async {
   print('🔢 Computation Benchmark');
-  
+
   // CPU-intensive calculation
   final stopwatch = Stopwatch()..start();
   int result = 0;
@@ -65,7 +65,8 @@ Future<void> runComputeBenchmark() async {
     result += (i * i) % 1000;
   }
   stopwatch.stop();
-  print('   Mathematical computation: ${stopwatch.elapsedMilliseconds}ms (result: $result)');
+  print(
+      '   Mathematical computation: ${stopwatch.elapsedMilliseconds}ms (result: $result)');
 
   // List operations
   final listStopwatch = Stopwatch()..start();
@@ -73,16 +74,17 @@ Future<void> runComputeBenchmark() async {
   numbers.sort();
   final sum = numbers.reduce((a, b) => a + b);
   listStopwatch.stop();
-  print('   List operations (100k items): ${listStopwatch.elapsedMilliseconds}ms (sum: $sum)');
+  print(
+      '   List operations (100k items): ${listStopwatch.elapsedMilliseconds}ms (sum: $sum)');
 }
 
 Future<void> runStringProcessingBenchmark() async {
   print('📋 String Processing Benchmark');
-  
+
   // Simulate JSON-like string parsing
   final stopwatch = Stopwatch()..start();
-  
-  final mockJsonString = '''
+
+  const mockJsonString = '''
   {
     "products": [
       {"id": 1, "name": "Aircraft A", "category": "Aircraft", "size": 250.5},
@@ -91,14 +93,15 @@ Future<void> runStringProcessingBenchmark() async {
     ]
   }
   ''';
-  
+
   // Parse manually (simplified)
   int parseCount = 0;
   for (int i = 0; i < 10000; i++) {
     if (mockJsonString.contains('Aircraft')) parseCount++;
     if (mockJsonString.contains('Scenery')) parseCount++;
   }
-  
+
   stopwatch.stop();
-  print('   String processing (10k iterations): ${stopwatch.elapsedMilliseconds}ms (matches: $parseCount)');
+  print(
+      '   String processing (10k iterations): ${stopwatch.elapsedMilliseconds}ms (matches: $parseCount)');
 }

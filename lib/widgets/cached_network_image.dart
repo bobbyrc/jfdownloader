@@ -69,12 +69,13 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
       }
 
       // Load from network
-      final response = await NetworkAssetBundle(Uri.parse(widget.imageUrl)).load('');
+      final response =
+          await NetworkAssetBundle(Uri.parse(widget.imageUrl)).load('');
       final data = response.buffer.asUint8List();
-      
+
       // Cache the image data
       _cache.cacheImage(widget.imageUrl, data);
-      
+
       if (mounted) {
         setState(() {
           _imageData = data;
@@ -82,7 +83,8 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
         });
       }
     } catch (e) {
-      LoggerService().warning('Failed to load image: ${widget.imageUrl}', 'CachedNetworkImage');
+      LoggerService().warning(
+          'Failed to load image: ${widget.imageUrl}', 'CachedNetworkImage');
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -161,7 +163,6 @@ class ProductImage extends StatelessWidget {
       imageUrl: imageUrl,
       width: width,
       height: height,
-      fit: BoxFit.cover,
       placeholder: _buildPlaceholder(context),
       errorWidget: _buildErrorWidget(context),
     );

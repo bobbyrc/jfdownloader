@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import '../services/logger_service.dart';
 
 /// Performance monitoring and metrics collection service
@@ -32,14 +31,12 @@ class PerformanceService {
     if (stopwatch != null) {
       stopwatch.stop();
       final duration = stopwatch.elapsed;
-      
+
       // Store metric
       _metrics.putIfAbsent(name, () => <Duration>[]).add(duration);
-      
+
       LoggerService().debug(
-        'Stopped timer: $name (${duration.inMilliseconds}ms)', 
-        'Performance'
-      );
+          'Stopped timer: $name (${duration.inMilliseconds}ms)', 'Performance');
       return duration;
     }
     return null;
@@ -75,7 +72,7 @@ class PerformanceService {
   Duration? getAverageDuration(String name) {
     final durations = _metrics[name];
     if (durations == null || durations.isEmpty) return null;
-    
+
     final totalMs = durations.fold(0, (sum, d) => sum + d.inMilliseconds);
     return Duration(milliseconds: (totalMs / durations.length).round());
   }
@@ -84,7 +81,7 @@ class PerformanceService {
   Duration? getTotalDuration(String name) {
     final durations = _metrics[name];
     if (durations == null || durations.isEmpty) return null;
-    
+
     final totalMs = durations.fold(0, (sum, d) => sum + d.inMilliseconds);
     return Duration(milliseconds: totalMs);
   }
@@ -102,31 +99,35 @@ class PerformanceService {
   /// Get performance summary
   Map<String, dynamic> getPerformanceSummary() {
     final summary = <String, dynamic>{};
-    
+
     // Add timing metrics
     for (final entry in _metrics.entries) {
       final name = entry.key;
       final durations = entry.value;
-      
+
       if (durations.isNotEmpty) {
         final avg = getAverageDuration(name);
         final total = getTotalDuration(name);
-        
+
         summary[name] = {
           'count': durations.length,
           'average_ms': avg?.inMilliseconds ?? 0,
           'total_ms': total?.inMilliseconds ?? 0,
-          'min_ms': durations.map((d) => d.inMilliseconds).reduce((a, b) => a < b ? a : b),
-          'max_ms': durations.map((d) => d.inMilliseconds).reduce((a, b) => a > b ? a : b),
+          'min_ms': durations
+              .map((d) => d.inMilliseconds)
+              .reduce((a, b) => a < b ? a : b),
+          'max_ms': durations
+              .map((d) => d.inMilliseconds)
+              .reduce((a, b) => a > b ? a : b),
         };
       }
     }
-    
+
     // Add counters
     if (_counters.isNotEmpty) {
       summary['counters'] = Map.from(_counters);
     }
-    
+
     return summary;
   }
 
@@ -148,7 +149,9 @@ class PerformanceService {
   Map<String, dynamic> getNetworkMetrics() {
     final networkMetrics = <String, dynamic>{};
     for (final entry in _metrics.entries) {
-      if (entry.key.contains('network') || entry.key.contains('http') || entry.key.contains('download')) {
+      if (entry.key.contains('network') ||
+          entry.key.contains('http') ||
+          entry.key.contains('download')) {
         final avg = getAverageDuration(entry.key);
         networkMetrics[entry.key] = {
           'count': entry.value.length,

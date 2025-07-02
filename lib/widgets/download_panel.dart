@@ -11,17 +11,21 @@ class DownloadPanel extends StatelessWidget {
     return Consumer<DownloadProvider>(
       builder: (context, downloadProvider, child) {
         final downloads = downloadProvider.downloads.values.toList();
-        
+
         return Column(
           children: [
             // Header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withOpacity(0.3),
                 border: Border(
                   bottom: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                    color:
+                        Theme.of(context).colorScheme.outline.withOpacity(0.2),
                   ),
                 ),
               ),
@@ -35,8 +39,8 @@ class DownloadPanel extends StatelessWidget {
                   Text(
                     'Downloads',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const Spacer(),
                   if (downloadProvider.downloads.isNotEmpty)
@@ -77,9 +81,10 @@ class DownloadPanel extends StatelessWidget {
                       children: [
                         Text(
                           'Overall Progress',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
                         ),
                         const Spacer(),
                         Text(
@@ -91,7 +96,8 @@ class DownloadPanel extends StatelessWidget {
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
                       value: downloadProvider.totalProgress,
-                      backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -112,7 +118,8 @@ class DownloadPanel extends StatelessWidget {
                           Icon(
                             Icons.download_outlined,
                             size: 48,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -122,9 +129,12 @@ class DownloadPanel extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             'Download files will appear here',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
                           ),
                         ],
                       ),
@@ -165,8 +175,8 @@ class _DownloadItem extends StatelessWidget {
                   child: Text(
                     download.fileName,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                          fontWeight: FontWeight.w500,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -174,16 +184,17 @@ class _DownloadItem extends StatelessWidget {
                 _buildStatusIcon(context),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Progress bar (only for active downloads)
             if (download.status == DownloadStatus.downloading)
               Column(
                 children: [
                   LinearProgressIndicator(
                     value: download.progress,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -201,7 +212,7 @@ class _DownloadItem extends StatelessWidget {
                   ),
                 ],
               ),
-            
+
             // Error message
             if (download.error != null)
               Container(
@@ -231,7 +242,7 @@ class _DownloadItem extends StatelessWidget {
                   ],
                 ),
               ),
-            
+
             // Action buttons
             if (download.status != DownloadStatus.completed)
               Row(
@@ -239,26 +250,31 @@ class _DownloadItem extends StatelessWidget {
                 children: [
                   if (download.status == DownloadStatus.downloading)
                     TextButton(
-                      onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                          .pauseDownload(download.fileId),
+                      onPressed: () =>
+                          Provider.of<DownloadProvider>(context, listen: false)
+                              .pauseDownload(download.fileId),
                       child: const Text('Pause'),
                     ),
                   if (download.status == DownloadStatus.paused)
                     TextButton(
-                      onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                          .resumeDownload(download.fileId),
+                      onPressed: () =>
+                          Provider.of<DownloadProvider>(context, listen: false)
+                              .resumeDownload(download.fileId),
                       child: const Text('Resume'),
                     ),
-                  if (download.status == DownloadStatus.failed || download.status == DownloadStatus.cancelled)
+                  if (download.status == DownloadStatus.failed ||
+                      download.status == DownloadStatus.cancelled)
                     TextButton(
-                      onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                          .retryDownload(download.fileId),
+                      onPressed: () =>
+                          Provider.of<DownloadProvider>(context, listen: false)
+                              .retryDownload(download.fileId),
                       child: const Text('Retry'),
                     ),
                   if (download.status != DownloadStatus.completed)
                     TextButton(
-                      onPressed: () => Provider.of<DownloadProvider>(context, listen: false)
-                          .cancelDownload(download.fileId),
+                      onPressed: () =>
+                          Provider.of<DownloadProvider>(context, listen: false)
+                              .cancelDownload(download.fileId),
                       child: const Text('Cancel'),
                     ),
                 ],
@@ -281,9 +297,9 @@ class _DownloadItem extends StatelessWidget {
         return Text(
           '${(download.progress * 100).toInt()}%',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.primary,
+              ),
         );
       case DownloadStatus.completed:
         return Icon(

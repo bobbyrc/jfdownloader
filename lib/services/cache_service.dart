@@ -7,7 +7,7 @@ class CacheService {
   static final CacheService _instance = CacheService._internal();
   factory CacheService() => _instance;
   CacheService._internal();
-  
+
   /// Initialize the cache service
   static Future<void> initialize() async {
     // Cache service initializes on first access
@@ -16,13 +16,14 @@ class CacheService {
 
   // Product image cache
   final _imageCache = LRUMap<String, Uint8List>(100); // Cache up to 100 images
-  
+
   // Product data cache
-  final _productCache = LRUMap<String, List<Product>>(10); // Cache product lists
-  
+  final _productCache =
+      LRUMap<String, List<Product>>(10); // Cache product lists
+
   // URL cache for product pages
   final _urlCache = LRUMap<String, String>(200); // Cache product URLs
-  
+
   // Cache expiry tracking
   final _cacheTimestamps = <String, DateTime>{};
   static const Duration _cacheExpiration = Duration(hours: 1);
@@ -36,7 +37,8 @@ class CacheService {
   /// Get cached image data
   Uint8List? getCachedImage(String url) {
     final timestamp = _cacheTimestamps['image_$url'];
-    if (timestamp != null && DateTime.now().difference(timestamp) > _cacheExpiration) {
+    if (timestamp != null &&
+        DateTime.now().difference(timestamp) > _cacheExpiration) {
       _imageCache.remove(url);
       _cacheTimestamps.remove('image_$url');
       return null;
@@ -53,7 +55,8 @@ class CacheService {
   /// Get cached product list
   List<Product>? getCachedProducts(String key) {
     final timestamp = _cacheTimestamps['products_$key'];
-    if (timestamp != null && DateTime.now().difference(timestamp) > _cacheExpiration) {
+    if (timestamp != null &&
+        DateTime.now().difference(timestamp) > _cacheExpiration) {
       _productCache.remove(key);
       _cacheTimestamps.remove('products_$key');
       return null;
@@ -70,7 +73,8 @@ class CacheService {
   /// Get cached product URL
   String? getCachedProductUrl(String productName) {
     final timestamp = _cacheTimestamps['url_$productName'];
-    if (timestamp != null && DateTime.now().difference(timestamp) > _cacheExpiration) {
+    if (timestamp != null &&
+        DateTime.now().difference(timestamp) > _cacheExpiration) {
       _urlCache.remove(productName);
       _cacheTimestamps.remove('url_$productName');
       return null;
@@ -82,7 +86,7 @@ class CacheService {
   void clearExpired() {
     final now = DateTime.now();
     final expiredKeys = <String>[];
-    
+
     for (final entry in _cacheTimestamps.entries) {
       if (now.difference(entry.value) > _cacheExpiration) {
         expiredKeys.add(entry.key);
@@ -158,5 +162,6 @@ class LRUMap<K, V> extends MapMixin<K, V> {
   @override
   V? remove(Object? key) => _cache.remove(key);
 
+  @override
   int get length => _cache.length;
 }

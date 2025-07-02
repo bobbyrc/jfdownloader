@@ -11,8 +11,8 @@ class LoggerService {
   LoggerService._internal();
 
   static bool _initialized = false;
-  static bool _isProduction = kReleaseMode;
-  
+  static final bool _isProduction = kReleaseMode;
+
   /// Initialize the logging service
   static void initialize() {
     if (_initialized) return;
@@ -37,11 +37,15 @@ class LoggerService {
   }
 
   /// Log an error message with optional error object and stack trace
-  void error(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
-    _log(LogLevel.error, message, tag: tag, error: error, stackTrace: stackTrace);
+  void error(String message,
+      {String? tag, Object? error, StackTrace? stackTrace}) {
+    _log(LogLevel.error, message,
+        tag: tag, error: error, stackTrace: stackTrace);
   }
 
-  void _log(LogLevel level, String message, {
+  void _log(
+    LogLevel level,
+    String message, {
     String? tag,
     Object? error,
     StackTrace? stackTrace,
@@ -56,7 +60,8 @@ class LoggerService {
       developer.log(
         message,
         time: DateTime.now(),
-        level: level.index * 300, // DEBUG: 0, INFO: 300, WARNING: 600, ERROR: 900
+        level:
+            level.index * 300, // DEBUG: 0, INFO: 300, WARNING: 600, ERROR: 900
         name: tag ?? 'JFDownloader',
         error: error,
         stackTrace: stackTrace,
@@ -77,7 +82,9 @@ class LoggerService {
   }
 
   /// Network request logging with structured data
-  void logNetworkRequest(String method, String url, {
+  void logNetworkRequest(
+    String method,
+    String url, {
     int? statusCode,
     Duration? duration,
     String? error,
@@ -87,15 +94,17 @@ class LoggerService {
       this.error('$message - Error: $error', tag: 'Network');
     } else if (statusCode != null) {
       final durationMs = duration?.inMilliseconds ?? 0;
-      debug('$message - ${statusCode} (${durationMs}ms)', 'Network');
+      debug('$message - $statusCode (${durationMs}ms)', 'Network');
     } else {
       debug(message, 'Network');
     }
   }
 
   /// Progress logging for long-running operations
-  void logProgress(String operation, int completed, int total, [String? details]) {
-    final percentage = total > 0 ? (completed / total * 100).toStringAsFixed(1) : '0.0';
+  void logProgress(String operation, int completed, int total,
+      [String? details]) {
+    final percentage =
+        total > 0 ? (completed / total * 100).toStringAsFixed(1) : '0.0';
     final message = '$operation: $completed/$total ($percentage%)';
     final fullMessage = details != null ? '$message - $details' : message;
     info(fullMessage, 'Progress');

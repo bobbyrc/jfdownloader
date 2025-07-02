@@ -24,110 +24,126 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          // Product image
-          Expanded(
-            flex: 3,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+            // Product image
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: product.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        placeholder: _buildPlaceholderImage(context),
+                        errorWidget: _buildPlaceholderImage(context),
+                      )
+                    : _buildPlaceholderImage(context),
               ),
-              child: product.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: _buildPlaceholderImage(context),
-                      errorWidget: _buildPlaceholderImage(context),
-                    )
-                  : _buildPlaceholderImage(context),
             ),
-          ),
-          
-          // Product information
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product name and category
-                  Row(
-                    children: [
+
+            // Product information
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product name and category
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            product.category,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSecondaryContainer,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Description
+                    if (product.description.isNotEmpty)
                       Expanded(
                         child: Text(
-                          product.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
+                          product.description,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product.category,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSecondaryContainer,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+
+                    const SizedBox(height: 12),
+
+                    // Download status and button
+                    Consumer<DownloadProvider>(
+                      builder: (context, downloadProvider, child) {
+                        final hasActiveDownloads = product.files.any((file) {
+                          final progress =
+                              downloadProvider.getDownloadProgress(file.id);
+                          return progress != null &&
+                              progress.status.name != 'completed';
+                        });
+
+                        if (hasActiveDownloads) {
+                          return _buildDownloadProgress(
+                              context, downloadProvider);
+                        }
+
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: product.isDownloaded ? null : onDownload,
+                            icon: Icon(product.isDownloaded
+                                ? Icons.check
+                                : Icons.download),
+                            label: Text(product.isDownloaded
+                                ? 'Downloaded'
+                                : 'Download'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: product.isDownloaded
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                  : null,
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Description
-                  if (product.description.isNotEmpty)
-                    Expanded(
-                      child: Text(
-                        product.description,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        );
+                      },
                     ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Download status and button
-                  Consumer<DownloadProvider>(
-                    builder: (context, downloadProvider, child) {
-                      final hasActiveDownloads = product.files.any((file) {
-                        final progress = downloadProvider.getDownloadProgress(file.id);
-                        return progress != null && progress.status.name != 'completed';
-                      });
-
-                      if (hasActiveDownloads) {
-                        return _buildDownloadProgress(context, downloadProvider);
-                      }
-
-                      return SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: product.isDownloaded ? null : onDownload,
-                          icon: Icon(product.isDownloaded ? Icons.check : Icons.download),
-                          label: Text(product.isDownloaded ? 'Downloaded' : 'Download'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: product.isDownloaded 
-                                ? Theme.of(context).colorScheme.surfaceVariant
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -143,7 +159,7 @@ class ProductCard extends StatelessWidget {
 
   Widget _buildPlaceholderImage(BuildContext context) {
     return Container(
-      color: Theme.of(context).colorScheme.surfaceVariant,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -165,10 +181,12 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDownloadProgress(BuildContext context, DownloadProvider downloadProvider) {
+  Widget _buildDownloadProgress(
+      BuildContext context, DownloadProvider downloadProvider) {
     final activeDownloads = product.files
         .map((file) => downloadProvider.getDownloadProgress(file.id))
-        .where((progress) => progress != null && progress.status.name != 'completed')
+        .where((progress) =>
+            progress != null && progress.status.name != 'completed')
         .toList();
 
     if (activeDownloads.isEmpty) {
@@ -176,9 +194,10 @@ class ProductCard extends StatelessWidget {
     }
 
     final totalProgress = activeDownloads.fold<double>(
-      0.0,
-      (sum, progress) => sum + (progress?.progress ?? 0.0),
-    ) / activeDownloads.length;
+          0.0,
+          (sum, progress) => sum + (progress?.progress ?? 0.0),
+        ) /
+        activeDownloads.length;
 
     return Column(
       children: [
@@ -187,7 +206,8 @@ class ProductCard extends StatelessWidget {
             Expanded(
               child: LinearProgressIndicator(
                 value: totalProgress,
-                backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                backgroundColor:
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
             ),
             const SizedBox(width: 8),

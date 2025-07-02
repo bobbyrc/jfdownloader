@@ -26,7 +26,8 @@ class DownloadProgress {
     this.endTime,
   });
 
-  factory DownloadProgress.fromJson(Map<String, dynamic> json) => _$DownloadProgressFromJson(json);
+  factory DownloadProgress.fromJson(Map<String, dynamic> json) =>
+      _$DownloadProgressFromJson(json);
   Map<String, dynamic> toJson() => _$DownloadProgressToJson(this);
 
   DownloadProgress copyWith({
@@ -56,12 +57,12 @@ class DownloadProgress {
 
   String get formattedSpeed {
     if (status != DownloadStatus.downloading || endTime != null) return '';
-    
+
     final duration = DateTime.now().difference(startTime);
     if (duration.inSeconds == 0) return '';
-    
+
     final bytesPerSecond = downloadedBytes / duration.inSeconds;
-    return _formatBytes(bytesPerSecond) + '/s';
+    return '${_formatBytes(bytesPerSecond)}/s';
   }
 
   String get formattedSize {
@@ -71,7 +72,8 @@ class DownloadProgress {
   String _formatBytes(double bytes) {
     if (bytes < 1024) return '${bytes.toInt()} B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

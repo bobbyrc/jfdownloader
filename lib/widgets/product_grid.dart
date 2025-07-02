@@ -1,9 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
+
 import '../models/product.dart';
-import '../providers/product_provider.dart';
 import '../providers/download_provider.dart';
+import '../providers/product_provider.dart';
 import 'product_card.dart';
 
 class ProductGrid extends StatelessWidget {
@@ -14,7 +15,7 @@ class ProductGrid extends StatelessWidget {
     return Consumer<ProductProvider>(
       builder: (context, productProvider, child) {
         final products = productProvider.products;
-        
+
         return GridView.builder(
           padding: const EdgeInsets.all(16),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -45,7 +46,8 @@ class ProductGrid extends StatelessWidget {
 
       if (selectedDirectory == null) return;
 
-      final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
       await downloadProvider.downloadProduct(product, selectedDirectory);
 
       if (context.mounted) {
